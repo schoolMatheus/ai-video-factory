@@ -68,7 +68,7 @@ def config(tmp_path: Path) -> InferenceConfig:
 
 
 def ok(stdout: str) -> ProcessResult:
-    return ProcessResult(0, stdout, "", "/safe/lms")
+    return ProcessResult(0, stdout, "", str(Path("/safe/lms").resolve()))
 
 
 def model_inventory_json(
@@ -433,7 +433,7 @@ def test_snapshot_sanitizes_and_caps_failed_command_stderr(config: InferenceConf
 
     runner = inventory_runner(config)
     runner.outputs[("lms", "runtime", "survey")] = ProcessResult(
-        1, "", "token=top-secret " + ("x" * (MAX_DIAGNOSTIC_CHARS * 2)), "/safe/lms"
+        1, "", "token=top-secret " + ("x" * (MAX_DIAGNOSTIC_CHARS * 2)), str(Path("/safe/lms").resolve())
     )
 
     with pytest.raises(LmStudioError) as raised:
@@ -453,7 +453,7 @@ def test_snapshot_rejects_malformed_loaded_model_json(config: InferenceConfig) -
 def test_run_process_rejects_a_mutating_command_before_subprocess(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: "/safe/lms")
+    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: str(Path("/safe/lms").resolve()))
     monkeypatch.setattr(
         lm_studio.subprocess,
         "run",
@@ -616,7 +616,7 @@ def test_estimate_accepts_valid_labels_on_stderr(config: InferenceConfig) -> Non
                 "Preparing estimate\n",
                 "Estimated GPU Memory: 17.36 GiB\n"
                 "Estimated Total Memory: 17.36 GiB\nConfidence: LOW\n",
-                "/safe/lms",
+                str(Path("/safe/lms").resolve()),
             )
         }
     )
@@ -646,7 +646,7 @@ def test_estimate_rejects_duplicate_or_conflicting_labels_split_across_streams(
                 "Estimated GPU Memory: 17.36 GiB\n"
                 "Estimated Total Memory: 17.36 GiB\nConfidence: LOW\n",
                 stderr,
-                "/safe/lms",
+                str(Path("/safe/lms").resolve()),
             )
         }
     )
@@ -760,7 +760,7 @@ def test_api_model_identifiers_requires_exact_models_endpoint(
 def test_default_runner_allows_only_exact_task_3_vectors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: "/safe/lms")
+    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: str(Path("/safe/lms").resolve()))
     calls: list[tuple[str, ...]] = []
 
     def run(argv: Sequence[str], **_kwargs: object) -> object:
@@ -778,17 +778,17 @@ def test_default_runner_allows_only_exact_task_3_vectors(
     for command in approved:
         lm_studio.run_process(command, 15)
 
-    assert calls == [("/safe/lms", *command[1:]) for command in approved]
+    assert calls == [(str(Path("/safe/lms").resolve()), *command[1:]) for command in approved]
 
 
 def test_resolved_lms_is_canonical_absolute_executable(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, make_symlink,
 ) -> None:
     executable = tmp_path / "real-lms"
     executable.write_text("#!/bin/sh\n")
     executable.chmod(0o755)
     alias = tmp_path / "lms"
-    alias.symlink_to(executable)
+    make_symlink(alias, executable)
     monkeypatch.setattr(lm_studio.shutil, "which", lambda _name: str(alias))
     lm_studio._resolved_lms.cache_clear()
 
@@ -812,7 +812,7 @@ def test_resolved_lms_is_canonical_absolute_executable(
 def test_default_runner_rejects_forbidden_or_weakened_vectors_before_subprocess(
     monkeypatch: pytest.MonkeyPatch, command: tuple[str, ...],
 ) -> None:
-    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: "/safe/lms")
+    monkeypatch.setattr(lm_studio, "_resolved_lms", lambda: str(Path("/safe/lms").resolve()))
     monkeypatch.setattr(
         lm_studio.subprocess,
         "run",

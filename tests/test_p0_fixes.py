@@ -501,7 +501,8 @@ def test_espeak_voice_resolution(requested, expected):
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_ffprobe_sibling_of_ffmpeg(tmp_path):
+def test_resolve_ffprobe_sibling_of_ffmpeg(tmp_path, monkeypatch):
+    monkeypatch.setattr("ai_video_factory.video_pipeline._FFPROBE_EXE", "ffprobe")
     ffmpeg = tmp_path / "ffmpeg"
     ffprobe = tmp_path / "ffprobe"
     ffmpeg.write_text("#!/bin/sh\n")

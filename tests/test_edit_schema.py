@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from ai_video_factory.edit_schema import EditDocument, load_edit
+from ai_video_factory.edit_schema import EditDocument, load_edit, save_edit
 
 
 INVALID_CASES = json.loads(
@@ -18,6 +18,18 @@ def test_fixture_is_valid() -> None:
     assert edit.width == 1280 and edit.height == 720
     assert edit.fps == 30 and edit.duration_frames == 90
     assert len(edit.scenes) == 1
+
+
+def test_save_edit_round_trips_unicode_as_utf8(tmp_path: Path) -> None:
+    edit = load_edit(Path("fixtures/synthetic-edit.json"))
+    edit.title = "Exploração — órbita 🚀"
+    edit.scenes[0].narration = "Água além da Terra — evidência científica."
+    destination = tmp_path / "nested" / "edit.json"
+
+    save_edit(edit, destination)
+
+    assert json.loads(destination.read_bytes().decode("utf-8"))["title"] == edit.title
+    assert load_edit(destination) == edit
 
 
 def test_scene_cannot_exceed_composition() -> None:

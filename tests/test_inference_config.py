@@ -44,10 +44,8 @@ def test_loads_checked_in_lm_studio_configuration(project_root: Path) -> None:
     assert config.parallel == 1
     assert config.ttl_seconds == 3_600
     assert config.minimum_available_memory_gib == 40
-    assert config.models_directory == "/home/summit/.lmstudio/models"
-    assert config.server_config_path == (
-        "/home/summit/.lmstudio/.internal/http-server-config.json"
-    )
+    assert config.models_directory == str(Path.home() / ".lmstudio/models")
+    assert config.server_config_path == str(Path.home() / ".lmstudio/.internal/http-server-config.json")
 
 
 @pytest.mark.parametrize(

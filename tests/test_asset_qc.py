@@ -15,13 +15,16 @@ from ai_video_factory.asset_qc import (
     verify_image_asset,
     verify_video_asset,
 )
+from ai_video_factory.platform_support import font_candidates
 
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT = next((path for path in font_candidates() if Path(path).is_file()), None)
 FFMPEG = shutil.which("ffmpeg")
 needs_ffmpeg = pytest.mark.skipif(not FFMPEG, reason="ffmpeg not available")
 
 
 def _big_font(size: int):
+    if FONT is None:
+        pytest.skip("no supported TrueType font is installed")
     return ImageFont.truetype(FONT, size)
 
 

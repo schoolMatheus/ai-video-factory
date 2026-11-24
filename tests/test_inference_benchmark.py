@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from ai_video_factory.hermes_backend import HERMES_EXECUTABLE_PATH
 from ai_video_factory.inference_benchmark import current_text_capability, run_capability_benchmark
 from ai_video_factory.inference_config import InferenceConfig
 from ai_video_factory.inference_service import InferenceService
@@ -458,7 +459,7 @@ def test_hermes_doctor_uses_real_unloaded_current_capability_report(tmp_path: Pa
         fallback_provider="nous", fallback_model="stepfun/step-3.7-flash:free",
     )
     hermes_snapshot = HermesSnapshot.model_validate({
-        "hermes_path": "/home/summit/.local/bin/hermes", "version": "0.21.0",
+        "hermes_path": HERMES_EXECUTABLE_PATH, "version": "0.21.0",
         "commit": "b0ab2e16", "config_path": "/safe/config.yaml", "profile": "default",
         "config_valid": True, "parent_provider": "nous",
         "parent_model": "stepfun/step-3.7-flash:free", "parent_base_url": "https://nous.example/v1",

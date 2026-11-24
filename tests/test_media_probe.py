@@ -46,9 +46,9 @@ def test_probe_media_uses_fixed_ffprobe_and_decode_commands() -> None:
             "-show_format",
             "-of",
             "json",
-            "/tmp/render.mp4",
+            str(Path("/tmp/render.mp4")),
         ),
-        ("ffmpeg", "-v", "error", "-i", "/tmp/render.mp4", "-f", "null", "-"),
+        ("ffmpeg", "-v", "error", "-i", str(Path("/tmp/render.mp4")), "-f", "null", "-"),
     ]
 
 

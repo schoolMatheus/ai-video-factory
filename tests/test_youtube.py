@@ -329,7 +329,8 @@ def test_save_credentials_owner_only(tmp_path):
     )
     path = save_credentials(creds, tmp_path)
     assert path == token_path(tmp_path)
-    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    if os.name == "posix":
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["refresh_token"] == "refresh"
 

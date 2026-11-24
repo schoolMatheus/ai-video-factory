@@ -118,7 +118,7 @@ def load_edit(path: Path) -> EditDocument:
 def save_edit(document: EditDocument, path: Path) -> None:
     """Save an edit document to a JSON file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(document.model_dump_json(indent=2))
+    path.write_text(document.model_dump_json(indent=2), encoding="utf-8")
 
 
 # ========== Seconds-keyed edit-document builder ==========

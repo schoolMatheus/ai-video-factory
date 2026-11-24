@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from ai_video_factory.hermes_backend import (
+    HERMES_EXECUTABLE_PATH,
     ALLOWED_COMMANDS,
     HermesBackend,
     HermesError,
@@ -37,7 +38,7 @@ def config() -> HermesConfig:
 
 
 def result(stdout: str) -> ProcessResult:
-    return ProcessResult(0, stdout, "", "/home/summit/.local/bin/hermes")
+    return ProcessResult(0, stdout, "", HERMES_EXECUTABLE_PATH)
 
 
 class FakeRunner:
@@ -53,7 +54,7 @@ class FakeRunner:
 def snapshot_outputs() -> dict[tuple[str, ...], ProcessResult]:
     values = {
         ("hermes", "--version"): "Hermes Agent v0.21.0 (2026.8.31) · upstream b0ab2e16\n",
-        ("hermes", "config", "path"): "/safe/config.yaml\n",
+        ("hermes", "config", "path"): str(Path("/safe/config.yaml").resolve()) + "\n",
         ("hermes", "config", "check"): "Configuration is valid\n",
         ("hermes", "config", "get", "model.provider"): "nous\n",
         ("hermes", "config", "get", "model.default"): "stepfun/step-3.7-flash:free\n",
@@ -184,6 +185,7 @@ def test_default_runner_rejects_combined_oversized_output(
         run_process(("hermes", "--version"), timeout=15.0)
 
 
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX /proc descriptor execution")
 def test_resolver_rejects_symlink_binds_swap_restore_to_opened_file_and_detects_mutation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -275,10 +277,10 @@ def test_snapshot_uses_individual_nonsecret_reads_and_typed_values() -> None:
     snapshot = HermesBackend(config(), runner=runner).snapshot()
 
     assert snapshot.model_dump() == {
-        "hermes_path": "/home/summit/.local/bin/hermes",
+        "hermes_path": HERMES_EXECUTABLE_PATH,
         "version": "0.21.0",
         "commit": "b0ab2e16",
-        "config_path": "/safe/config.yaml",
+        "config_path": str(Path("/safe/config.yaml").resolve()),
         "profile": "default",
         "config_valid": True,
         "parent_provider": "nous",
@@ -305,7 +307,7 @@ def test_snapshot_represents_missing_delegation_keys_as_unconfigured() -> None:
     outputs = snapshot_outputs()
     for argv in list(outputs):
         if argv[3:4] == ("delegation.model",) or argv[3:4] == ("delegation.base_url",):
-            outputs[argv] = ProcessResult(1, "", "key not found", "/home/summit/.local/bin/hermes", missing=True)
+            outputs[argv] = ProcessResult(1, "", "key not found", HERMES_EXECUTABLE_PATH, missing=True)
 
     snapshot = HermesBackend(config(), runner=FakeRunner(outputs)).snapshot()
 
@@ -384,7 +386,7 @@ def test_snapshot_rejects_malformed_or_duplicate_version_identity(version_text: 
 def test_snapshot_rejects_nonzero_injected_config_get_even_when_optional() -> None:
     outputs = snapshot_outputs()
     outputs[("hermes", "config", "get", "delegation.model")] = ProcessResult(
-        1, "", "arbitrary failure", "/home/summit/.local/bin/hermes",
+        1, "", "arbitrary failure", HERMES_EXECUTABLE_PATH,
     )
 
     with pytest.raises(HermesError, match="unsuccessfully"):

@@ -7,6 +7,14 @@ const invalidCases = JSON.parse(
 ) as Array<{name: string; document: unknown}>;
 
 describe('parseEditDocument', () => {
+  test('accepts chunk metadata and preserves the karaoke caption flag', () => {
+    const parsed = parseEditDocument({
+      schema_version: 1, width: 1280, height: 720, fps: 30, duration_frames: 30,
+      scenes: [], total_scenes: 10, scene_start_index: 4, karaoke_captions: true,
+    });
+    expect(parsed.karaoke_captions).toBe(true);
+  });
+
   test('rejects a scene beyond the composition', () => {
     expect(() => parseEditDocument({
       schema_version: 1, width: 1280, height: 720, fps: 30, duration_frames: 30,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai_video_factory.hermes_backend import HermesError
+from ai_video_factory.hermes_backend import HERMES_EXECUTABLE_PATH, HermesError
 from ai_video_factory.hermes_config import HermesConfig
 from ai_video_factory.hermes_models import HermesSnapshot
 from ai_video_factory.hermes_service import HermesService
@@ -21,7 +21,7 @@ def config() -> HermesConfig:
 
 def snapshot(**changes: object) -> HermesSnapshot:
     values: dict[str, object] = {
-        "hermes_path": "/home/summit/.local/bin/hermes", "version": "0.21.0", "commit": "b0ab2e16",
+        "hermes_path": HERMES_EXECUTABLE_PATH, "version": "0.21.0", "commit": "b0ab2e16",
         "config_path": "/safe/config.yaml", "profile": "default", "config_valid": True,
         "parent_provider": "nous", "parent_model": "stepfun/step-3.7-flash:free",
         "parent_base_url": "https://nous.example/v1", "delegation_model": "avf-qwen36-executor",

@@ -111,7 +111,7 @@ def test_reuses_digest_only_when_path_size_and_mtime_match(tmp_path: Path) -> No
     assert hasher.calls == [model, model]
 
 
-def test_rejects_symlink_or_path_escape(tmp_path: Path) -> None:
+def test_rejects_path_escape(tmp_path: Path) -> None:
     cache, model, _hasher = cache_fixture(tmp_path)
     escaped = LmStudioModel(
         model_key="local-model",
@@ -123,8 +123,11 @@ def test_rejects_symlink_or_path_escape(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="contained"):
         cache.identity(escaped)
 
+
+def test_rejects_symlink(tmp_path: Path, make_symlink) -> None:
+    cache, model, _hasher = cache_fixture(tmp_path)
     alias = model.parent / "alias.gguf"
-    alias.symlink_to(model)
+    make_symlink(alias, model)
     with pytest.raises(ValueError, match="non-symlink"):
         cache.identity(model_record(alias, root=tmp_path / "models"))
 
@@ -155,12 +158,12 @@ def test_rejects_unexplained_package_size_mismatch(tmp_path: Path) -> None:
     assert not hasher.calls
 
 
-def test_rejects_symlinked_mmproj_companion(tmp_path: Path) -> None:
+def test_rejects_symlinked_mmproj_companion(tmp_path: Path, make_symlink) -> None:
     cache, model, hasher = cache_fixture(tmp_path)
     projector = model.parent / "projector.gguf"
     projector.write_bytes(b"vision-projector")
     companion = model.parent / "mmproj-F16.gguf"
-    companion.symlink_to(projector)
+    make_symlink(companion, projector)
 
     with pytest.raises(ValueError, match="non-symlink"):
         cache.identity(

@@ -73,7 +73,7 @@ const assertExactKeys = (
   const allowed = new Set(expected);
   const unknown = Object.keys(value).find((key) => !allowed.has(key));
   if (unknown !== undefined) {
-    // Unknown fields ignored: LLMs add metadata like total_scenes
+    throw new Error(`${label} has unknown field: ${unknown}`);
   }
 };
 
@@ -116,7 +116,7 @@ export const parseEditDocument = (value: unknown): EditDocument => {
   }
   assertExactKeys(
     value,
-    ['schema_version', 'width', 'height', 'fps', 'duration_frames', 'scenes', 'title', 'description', 'created_at', 'sources', 'total_scenes'],
+    ['schema_version', 'width', 'height', 'fps', 'duration_frames', 'scenes', 'title', 'description', 'created_at', 'sources', 'total_scenes', 'scene_start_index', 'karaoke_captions'],
     'edit document',
   );
 
