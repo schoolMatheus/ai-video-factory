@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -253,6 +254,15 @@ def test_render_wires_verified_browser_to_remotion_wrapper(monkeypatch, tmp_path
 
     pipeline._render_with_remotion(project, fixture, output)
 
+    if os.name == "nt":
+        assert len(calls) == 2
+        assert calls[0][0][1:] == (str(remotion / "node_modules/typescript/bin/tsc"), "-p", "tsconfig.json")
+        assert calls[1][0][1:] == (
+            str(remotion / "dist/render.js"), "--props", str(fixture), str(output),
+            "--browser-executable", str(browser.resolve()),
+        )
+        assert all(cwd == remotion and name == "Remotion render" for _, cwd, name in calls)
+        return
     assert calls == [
         (
             (

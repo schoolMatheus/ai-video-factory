@@ -7,6 +7,8 @@ dependencies = [
     "typer>=0.27,<0.28",
     "pydantic>=2.12,<3",
     "Pillow>=10",
+    "numpy>=1.26,<3",
+    "tzdata>=2025.1; sys_platform == 'win32'",
 ]
 
 [project.scripts]

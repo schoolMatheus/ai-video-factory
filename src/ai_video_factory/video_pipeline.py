@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Any, Iterator, Literal
 from uuid import uuid4
 
-import fcntl
+from ai_video_factory.file_lock import exclusive_file_lock
+from ai_video_factory.platform_support import browser_candidates, remotion_commands, windows_file_version
 
 from ai_video_factory.edit_schema import EditDocument, EditScene, load_edit, save_edit, scene_asset_slots
 from ai_video_factory.lm_studio import LmStudioError
@@ -161,13 +162,8 @@ def remotion_public_lock(data_root: Path) -> Iterator[None]:
     The lock file lives under data/ (gitignored) and is created on demand.
     """
     lock_path = Path(data_root) / ".avf-public.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "a+b") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    with exclusive_file_lock(lock_path):
+        yield
 
 
 def _pipeline_inputs(
@@ -244,13 +240,11 @@ def _collect_pipeline_toolchain() -> dict[str, dict[str, Any]]:
         else:
             tools["browser"] = {"status": "not_ready", "error": str(configured)}
     else:
-        for candidate in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
-            located = shutil.which(candidate)
-            if located is not None:
-                browser = _verified_executable(Path(located))
-                if browser is not None:
-                    tools["browser"] = _executable_identity(browser, ("--version",))
-                    break
+        for candidate in browser_candidates():
+            browser = _verified_executable(candidate)
+            if browser is not None:
+                tools["browser"] = _executable_identity(browser, ("--version",))
+                break
     
     # Find other tools
     for name, executable, version_arguments in (
@@ -283,6 +277,10 @@ def _executable_identity(path: Path, version_arguments: Sequence[str]) -> dict[s
     resolved = _verified_executable(path)
     if resolved is None:
         raise PipelineCommandError(f"tool does not resolve to an executable file: {path}")
+    if resolved.name.lower() in ("chrome.exe", "msedge.exe", "chrome-headless-shell.exe"):
+        version = windows_file_version(resolved)
+        if version:
+            return {"status": "ready", "path": str(resolved), "sha256": _sha256(resolved), "version": version}
     try:
         completed = subprocess.run(
             (str(resolved), *version_arguments),
@@ -934,22 +932,8 @@ def _render_with_remotion(
 ) -> None:
     remotion_directory = project_root / "remotion"
     browser = browser or _find_local_browser()
-    _run_command(
-        (
-            str(npm) if npm is not None else "npm",
-            "run",
-            "render",
-            "--",
-            "--props",
-            os.path.relpath(fixture, remotion_directory),
-            os.path.relpath(output, remotion_directory),
-            "--browser-executable",
-            str(browser),
-        ),
-        cwd=remotion_directory,
-        name="Remotion render",
-        timeout=timeout,
-    )
+    for command in remotion_commands(project_root, fixture, output, browser, npm):
+        _run_command(command, cwd=remotion_directory, name="Remotion render", timeout=timeout)
 
 
 def _find_local_browser() -> Path:
@@ -962,12 +946,10 @@ def _find_local_browser() -> Path:
             "REMOTION_CHROME_EXECUTABLE does not name an existing executable browser"
         )
 
-    for candidate in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
-        located = shutil.which(candidate)
-        if located is not None:
-            browser = _verified_executable(Path(located))
-            if browser is not None:
-                return browser
+    for candidate in browser_candidates():
+        browser = _verified_executable(candidate)
+        if browser is not None:
+            return browser
     raise LocalBrowserError(
         "no verified local browser executable; install or configure REMOTION_CHROME_EXECUTABLE"
     )
@@ -1356,6 +1338,8 @@ def _run_command(
                 timeout=timeout,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as error:

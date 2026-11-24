@@ -66,6 +66,8 @@ KNOWN ISSUES
 
 from __future__ import annotations
 
+from ai_video_factory.platform_support import venv_program
+
 import json
 import logging
 import os
@@ -168,7 +170,7 @@ def default_steps(variant: str) -> int:
 
 def backend_available(variant: str = "auto") -> tuple[bool, str]:
     """Check the LTX backend. Returns (ok, human-readable detail)."""
-    venv_python = BACKEND_VENV / "bin" / "python"
+    venv_python = venv_program(BACKEND_VENV, "python")
     if not venv_python.exists():
         return False, (
             f"backend venv python not found: {venv_python}. "
@@ -273,7 +275,7 @@ def generate_hero_clip(
     out = OUTPUT_DIR / f"hero-{stamp}-s{seed if seed is not None else 'rand'}.mp4"
 
     cmd = [
-        str(BACKEND_VENV / "bin" / "python"),
+        str(venv_program(BACKEND_VENV, "python")),
         str(WORKER),
         "--variant", resolved,
         "--model-dir", str(model_dir),

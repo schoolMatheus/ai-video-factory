@@ -28,14 +28,11 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from ai_video_factory.edit_schema import EditDocument
 from ai_video_factory.sanitization import sanitize_diagnostic
+from ai_video_factory.platform_support import font_candidates
 
 
 # A few web-safe fallbacks for a heavy sans; the first that loads wins.
-_FONT_CANDIDATES = (
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-)
+_FONT_CANDIDATES = font_candidates()
 
 
 def _load_font(size: int) -> Any:
@@ -52,7 +49,7 @@ def _load_font(size: int) -> Any:
 def _load_font_bold(size: int) -> Any:
     """Load a bold TTF if one is available, else fall back to :func:`_load_font`."""
     for path in _FONT_CANDIDATES:
-        if "Bold" in path or "DejaVuSans-Bold" in path:
+        if "Bold" in path or Path(path).name.lower() in ("arialbd.ttf", "segoeuib.ttf"):
             try:
                 return ImageFont.truetype(path, size)
             except (OSError, IOError):

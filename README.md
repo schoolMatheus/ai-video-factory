@@ -41,6 +41,29 @@ Demo #1 (AI-generated teaser): https://youtu.be/CASvWRXd3jg
 
 ## Quickstart
 
+### Native Windows (PowerShell)
+
+Windows startup and the synthetic render test are supported without WSL.
+After installing Python 3.12, Node.js, FFmpeg (including ffprobe), and Chrome
+or Edge, run these commands from the repository root:
+
+```powershell
+python -m pip install --user uv
+python -m uv sync
+npm.cmd --prefix remotion ci --no-audit --no-fund
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+.\aivideofactory.cmd --help
+.\aivideofactory.cmd doctor
+.\aivideofactory.cmd test-pipeline --json
+```
+
+The test renders a three-second synthetic video without a language model or
+TTS model. Producing a video from a topic also requires configuring narration,
+an OpenAI-compatible model endpoint, and media sources. See
+[Windows setup and limitations](docs/windows.md).
+
+### Linux
+
 Prerequisites: Python 3.12, [uv](https://docs.astral.sh/uv/), FFmpeg with
 ffprobe, and an OpenAI-compatible chat completions endpoint for script
 writing (LM Studio locally, llama-server, or any hosted API).

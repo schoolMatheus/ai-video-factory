@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 from ai_video_factory.preflight import (
     STATUS_FAIL,
@@ -66,9 +67,9 @@ def test_hero_backend_missing_warns(tmp_path: Path):
 
 def test_hero_backend_ready_passes(tmp_path: Path):
     root = _repo(tmp_path)
-    venv_bin = root / ".venv-ltx2" / "bin"
+    venv_bin = root / ".venv-ltx2" / ("Scripts" if os.name == "nt" else "bin")
     venv_bin.mkdir(parents=True)
-    (venv_bin / "python").write_text("#!/bin/sh\n")
+    (venv_bin / ("python.exe" if os.name == "nt" else "python")).write_text("fake interpreter\n")
     (root / "scripts" / "generate_ltx2.py").write_text("# worker\n")
     weights = root / "models" / "LTX-2" / "transformer"
     weights.mkdir(parents=True)
@@ -81,8 +82,9 @@ def test_hero_backend_env_override(tmp_path: Path, monkeypatch):
     root = _repo(tmp_path)
     (root / "scripts" / "generate_ltx2.py").write_text("# worker\n")
     alt = tmp_path / "alt-venv"
-    (alt / "bin").mkdir(parents=True)
-    (alt / "bin" / "python").write_text("#!/bin/sh\n")
+    programs = alt / ("Scripts" if os.name == "nt" else "bin")
+    programs.mkdir(parents=True)
+    (programs / ("python.exe" if os.name == "nt" else "python")).write_text("fake interpreter\n")
     model = tmp_path / "alt-model" / "transformer"
     model.mkdir(parents=True)
     (model / "w.safetensors").write_bytes(b"\x00")
@@ -180,9 +182,9 @@ def test_inference_config_unparseable_warns(tmp_path: Path):
 
 def _full_pass_env(tmp_path: Path) -> dict:
     root = _repo(tmp_path)
-    venv_bin = root / ".venv-ltx2" / "bin"
+    venv_bin = root / ".venv-ltx2" / ("Scripts" if os.name == "nt" else "bin")
     venv_bin.mkdir(parents=True)
-    (venv_bin / "python").write_text("#!/bin/sh\n")
+    (venv_bin / ("python.exe" if os.name == "nt" else "python")).write_text("fake interpreter\n")
     (root / "scripts" / "generate_ltx2.py").write_text("# worker\n")
     weights = root / "models" / "LTX-2" / "transformer"
     weights.mkdir(parents=True)

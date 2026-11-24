@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from ai_video_factory.edit_schema import load_edit
 from ai_video_factory.media_probe import MediaProbeError, probe_media
+from ai_video_factory.platform_support import browser_candidates, remotion_commands, windows_file_version
 from ai_video_factory.qc import evaluate_qc, write_qc_reports
 from ai_video_factory.run_store import RunStore
 from ai_video_factory.sanitization import first_diagnostic_line, sanitize_diagnostic
@@ -310,6 +311,10 @@ def _executable_identity(path: Path, version_arguments: Sequence[str]) -> dict[s
     resolved = _verified_executable(path)
     if resolved is None:
         raise PipelineCommandError(f"tool does not resolve to an executable file: {path}")
+    if resolved.name.lower() in ("chrome.exe", "msedge.exe", "chrome-headless-shell.exe"):
+        version = windows_file_version(resolved)
+        if version:
+            return {"status": "ready", "path": str(resolved), "sha256": _sha256(resolved), "version": version}
     try:
         completed = subprocess.run(
             (str(resolved), *version_arguments),
@@ -365,21 +370,8 @@ def _render_with_remotion(
 ) -> None:
     remotion_directory = project_root / "remotion"
     browser = browser or _find_local_browser()
-    _run_command(
-        (
-            str(npm) if npm is not None else "npm",
-            "run",
-            "render",
-            "--",
-            "--props",
-            os.path.relpath(fixture, remotion_directory),
-            os.path.relpath(output, remotion_directory),
-            "--browser-executable",
-            str(browser),
-        ),
-        cwd=remotion_directory,
-        name="Remotion render",
-    )
+    for command in remotion_commands(project_root, fixture, output, browser, npm):
+        _run_command(command, cwd=remotion_directory, name="Remotion render")
 
 
 def _find_local_browser() -> Path:
@@ -392,12 +384,10 @@ def _find_local_browser() -> Path:
             "REMOTION_CHROME_EXECUTABLE does not name an existing executable browser"
         )
 
-    for candidate in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
-        located = shutil.which(candidate)
-        if located is not None:
-            browser = _verified_executable(Path(located))
-            if browser is not None:
-                return browser
+    for candidate in browser_candidates():
+        browser = _verified_executable(candidate)
+        if browser is not None:
+            return browser
     raise LocalBrowserError(
         "no verified local browser executable; install or configure REMOTION_CHROME_EXECUTABLE"
     )
@@ -446,6 +436,8 @@ def _run_command(argv: Sequence[str], *, cwd: Path, name: str) -> None:
             timeout=180,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as error:

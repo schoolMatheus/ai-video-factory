@@ -13,16 +13,17 @@ scheduler:
 
 from __future__ import annotations
 
-import fcntl
 import json
 import re
 import tomllib
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, time as dtime
 from pathlib import Path
 from typing import Any, Callable, Iterator
 from zoneinfo import ZoneInfo
+
+from ai_video_factory.file_lock import exclusive_file_lock
 
 
 class SchedulerError(RuntimeError):
@@ -198,20 +199,15 @@ def scheduler_lock(data_dir: Path) -> Iterator[None]:
     overlaps or manual invocations.
     """
     lock_path = Path(data_dir) / "scheduler.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("w", encoding="utf-8") as handle:
+    # Catch acquisition errors only; errors inside the job retain their identity.
+    with ExitStack() as stack:
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as error:
+            stack.enter_context(exclusive_file_lock(lock_path, blocking=False))
+        except BlockingIOError as error:
             raise SchedulerBusy(
                 "another scheduler run is already holding the lock"
             ) from error
-        try:
-            handle.write(f"{datetime.now().isoformat()}\n")
-            handle.flush()
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        yield
 
 
 def _channel_state_path(state_dir: Path, slug: str) -> Path:

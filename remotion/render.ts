@@ -1,6 +1,7 @@
 import {mkdirSync, readFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {createRequire} from 'node:module';
 import {parseEditDocument} from './src/schema.js';
 
 const usage = 'Usage: npm run render -- --props <edit.json> <output.mp4> --browser-executable <local-browser>';
@@ -11,17 +12,21 @@ if (args.length !== 5 || args[0] !== '--props' || args[3] !== '--browser-executa
 }
 
 const [ , propsPath, outputPath, , browserExecutable] = args;
-const inputProps = parseEditDocument(JSON.parse(readFileSync(resolve(propsPath), 'utf8')));
+const propsFile = resolve(propsPath);
+parseEditDocument(JSON.parse(readFileSync(propsFile, 'utf8')));
 const output = resolve(outputPath);
 mkdirSync(dirname(output), {recursive: true});
 
+const require = createRequire(import.meta.url);
+const cli = resolve(dirname(require.resolve('@remotion/cli/package.json')), 'remotion-cli.js');
 const render = spawnSync(
-  resolve('node_modules/.bin/remotion'),
+  process.execPath,
   [
-    'render', 'src/index.ts', 'SyntheticVideo', output, '--muted', '--props', JSON.stringify(inputProps),
+    cli,
+    'render', 'src/index.ts', 'SyntheticVideo', output, '--muted', '--props', propsFile,
     '--browser-executable', browserExecutable,
   ],
-  {stdio: 'inherit'},
+  {stdio: 'inherit', windowsHide: true},
 );
 
 if (render.error) {

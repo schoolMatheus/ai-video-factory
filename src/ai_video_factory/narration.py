@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_video_factory.sanitization import sanitize_diagnostic
+from ai_video_factory.platform_support import venv_program
 
 
 class NarrationError(RuntimeError):
@@ -32,9 +33,7 @@ _MARKDOWN_LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 _BARE_URL = re.compile(r"https?://\S+")
 _MARKDOWN_CHARS = re.compile(r"[*_#>`~]")
 
-_PIPER_VENV_BIN = (
-    Path(__file__).resolve().parents[2] / ".tts-venv" / "bin" / "piper"
-)
+_PIPER_VENV_BIN = venv_program(Path(__file__).resolve().parents[2] / ".tts-venv", "piper")
 _PIPER_MODEL = (
     Path(__file__).resolve().parents[2] / "models" / "tts" / "en_US-lessac-high.onnx"
 )

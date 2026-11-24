@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import shutil
 from collections.abc import Callable, Sequence
 from typing import Literal
 
@@ -37,7 +38,7 @@ _PROBES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 def _subprocess_runner(argv: Sequence[str]) -> CommandResult:
     completed = subprocess.run(
-        argv,
+        (shutil.which(argv[0]) or argv[0], *argv[1:]),
         shell=False,
         timeout=15,
         capture_output=True,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 import pytest
 
@@ -77,7 +78,7 @@ def test_default_steps():
 
 
 def _fake_venv(root: Path) -> Path:
-    p = root / "venv" / "bin" / "python"
+    p = root / "venv" / ("Scripts" if os.name == "nt" else "bin") / ("python.exe" if os.name == "nt" else "python")
     p.parent.mkdir(parents=True)
     p.write_text("#!/bin/sh\n")
     return root / "venv"

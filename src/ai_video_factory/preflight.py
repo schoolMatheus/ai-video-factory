@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
+from ai_video_factory.platform_support import font_candidates, venv_program
+
 STATUS_PASS = "pass"
 STATUS_WARN = "warn"
 STATUS_FAIL = "fail"
@@ -35,12 +37,7 @@ HERO_GRID_STRIDE = 32
 
 # System font files the pipeline's own caption/thumbnail renderers accept
 # before falling back to Pillow's bundled bitmap font.
-_CAPTION_FONT_CANDIDATES = (
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-)
+_CAPTION_FONT_CANDIDATES = font_candidates()
 
 _STOCK_KEY_PROVIDERS = (
     ("PEXELS_API_KEY", "pexels"),
@@ -125,9 +122,7 @@ def check_hero_backend(
     """LTX hero-clip backend: venv python, worker script, model weights."""
     mapping = _env(env)
     root = Path(repo_root)
-    venv_python = Path(
-        mapping.get("LTX2_VENV", str(root / ".venv-ltx2"))
-    ) / "bin" / "python"
+    venv_python = venv_program(Path(mapping.get("LTX2_VENV", str(root / ".venv-ltx2"))), "python")
     worker = root / "scripts" / "generate_ltx2.py"
     model_dir = Path(mapping.get("LTX2_MODEL_DIR", str(root / "models" / "LTX-2")))
     transformer_dir = model_dir / "transformer"
