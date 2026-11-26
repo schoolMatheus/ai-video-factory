@@ -5,13 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ai_video_factory.ui_backend import domain
 from ai_video_factory.ui_backend.models import (
     ActionAvailability,
     ActionRequest,
+    ArtifactView,
     CapabilitiesView,
     EventPage,
     JobView,
@@ -27,6 +28,7 @@ from ai_video_factory.ui_backend.models import (
     StageStatus,
     StageView,
 )
+from ai_video_factory.ui_backend.artifacts import ArtifactService
 from ai_video_factory.ui_backend.events import EventService
 from ai_video_factory.ui_backend.read_models import ProductionReadModels
 from ai_video_factory.sanitization import sanitize_diagnostic
@@ -203,6 +205,82 @@ def jobs_of(request: Request):  # type: ignore[no-untyped-def]
     if job_service is None:
         raise DependencyUnavailableError("Fila de jobs não disponível.")
     return job_service
+
+
+def artifacts_of(request: Request) -> ArtifactService:
+    service = request.app.state.services.artifacts
+    if service is None:
+        from ai_video_factory.ui_backend.models import DependencyUnavailableError
+
+        raise DependencyUnavailableError("Serviço de artefatos não disponível.")
+    return service
+
+
+@router.get("/productions/{production_id}/artifacts", response_model=list[ArtifactView])
+def artifacts(production_id: str, request: Request) -> list[ArtifactView]:
+    _, _, models = services_of(request)
+    return models.list_artifacts(production_id)
+
+
+@router.get("/artifacts/{artifact_id}/content")
+def artifact_content(
+    artifact_id: str, request: Request, range: str | None = Header(default=None)
+) -> StreamingResponse:
+    service = artifacts_of(request)
+    resolved = service.resolve(artifact_id)
+    span = service.parse_range(range, resolved.size_bytes)
+
+    def stream():
+        with resolved.path.open("rb") as source:
+            if span is not None:
+                source.seek(span[0])
+                remaining = span[1] - span[0] + 1
+            else:
+                remaining = None
+            while remaining is None or remaining > 0:
+                block = source.read(65_536 if remaining is None else min(65_536, remaining))
+                if not block:
+                    break
+                if remaining is not None:
+                    remaining -= len(block)
+                yield block
+
+    headers = {"Accept-Ranges": "bytes"}
+    status_code = 200
+    if span is not None:
+        status_code = 206
+        headers["Content-Range"] = f"bytes {span[0]}-{span[1]}/{resolved.size_bytes}"
+    return StreamingResponse(
+        stream(),
+        status_code=status_code,
+        media_type=resolved.media_type,
+        headers=headers,
+    )
+
+
+@router.post("/productions/{production_id}/uploads", status_code=201)
+async def upload_artifact(
+    production_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict[str, object]:
+    service = artifacts_of(request)
+    _, _, models = services_of(request)
+    models.get_production(production_id)
+    content = await file.read(64 * 1024 * 1024 + 1)
+    upload = service.store_upload(
+        production_id,
+        filename=file.filename or "arquivo",
+        content=content,
+        media_type=file.content_type or "application/octet-stream",
+    )
+    return {
+        "id": upload.id,
+        "name": upload.name,
+        "sha256": upload.sha256,
+        "size_bytes": upload.size_bytes,
+        "confirmed_in_manifest": False,
+    }
 
 
 def events_of(request: Request) -> EventService:

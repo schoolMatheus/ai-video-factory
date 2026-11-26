@@ -10,6 +10,10 @@ import { ArtifactViewer } from "../../components/ArtifactViewer";
 import { InlineError } from "../../components/InlineError";
 import { StageList } from "../../components/StageList";
 import { StatusText } from "../../components/StatusText";
+import { MediaView } from "../stages/MediaView";
+import { NarrationView } from "../stages/NarrationView";
+import { ResearchView } from "../stages/ResearchView";
+import { ScriptView } from "../stages/ScriptView";
 import styles from "./ProductionWorkspace.module.css";
 
 const STAGE_LABELS: Record<StageName, string> = {
@@ -48,6 +52,10 @@ function StageInspector({ stage }: { stage: StageView | undefined }) {
           onRetry={stage.problem.recoverable ? () => undefined : undefined}
         />
       )}
+      {stage.name === "research" && <ResearchView />}
+      {stage.name === "script" && <ScriptView />}
+      {stage.name === "narration" && <NarrationView />}
+      {stage.name === "media" && <MediaView />}
       {(stage.artifacts ?? []).map((artifact) => (
         <ArtifactViewer key={artifact.id} artifact={artifact} />
       ))}

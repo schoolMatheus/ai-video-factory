@@ -49,6 +49,17 @@ class ControlStore:
                     job_id TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS uploads (
+                    id TEXT PRIMARY KEY,
+                    production_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    media_type TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    confirmed INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id TEXT PRIMARY KEY,
                     production_id TEXT,

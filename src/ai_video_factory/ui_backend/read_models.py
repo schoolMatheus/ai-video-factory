@@ -242,6 +242,16 @@ class ProductionReadModels:
         run = self._find_run(production_id)
         return self._artifacts(run.manifest)
 
+    def find_artifact(
+        self, artifact_id: str
+    ) -> tuple[str, str, ArtifactIntegrity] | None:
+        """Return (production_id, key, integrity) for a stable artifact id."""
+        for run in self._all_runs():
+            for key, integrity in run.manifest.artifact_integrity.items():
+                if self._artifact_id(run.manifest.run_id, key) == artifact_id:
+                    return run.manifest.run_id, key, integrity
+        return None
+
     # -- helpers -----------------------------------------------------------
 
     def _title(self, manifest: RunManifest) -> str:

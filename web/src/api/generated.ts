@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/artifacts/{artifact_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artifact Content */
+        get: operations["artifact_content_api_v1_artifacts__artifact_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/capabilities": {
         parameters: {
             query?: never;
@@ -110,6 +127,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/productions/{production_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artifacts */
+        get: operations["artifacts_api_v1_productions__production_id__artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/productions/{production_id}/events": {
         parameters: {
             query?: never;
@@ -155,6 +189,23 @@ export interface paths {
         get: operations["stream_api_v1_productions__production_id__stream_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/productions/{production_id}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Artifact */
+        post: operations["upload_artifact_api_v1_productions__production_id__uploads_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -293,6 +344,11 @@ export interface components {
             /** Size Bytes */
             size_bytes?: number | null;
             stage?: components["schemas"]["StageName"] | null;
+        };
+        /** Body_upload_artifact_api_v1_productions__production_id__uploads_post */
+        Body_upload_artifact_api_v1_productions__production_id__uploads_post: {
+            /** File */
+            file: string;
         };
         /** CapabilitiesView */
         CapabilitiesView: {
@@ -558,6 +614,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    artifact_content_api_v1_artifacts__artifact_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                range?: string | null;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     capabilities_api_v1_capabilities_get: {
         parameters: {
             query?: never;
@@ -779,6 +868,37 @@ export interface operations {
             };
         };
     };
+    artifacts_api_v1_productions__production_id__artifacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     events_api_v1_productions__production_id__events_get: {
         parameters: {
             query?: {
@@ -862,6 +982,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_artifact_api_v1_productions__production_id__uploads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_artifact_api_v1_productions__production_id__uploads_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

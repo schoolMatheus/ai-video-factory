@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from ai_video_factory.ui_backend.artifacts import ArtifactService
 from ai_video_factory.ui_backend.events import EventService
 from ai_video_factory.ui_backend.jobs import JobService
 from ai_video_factory.ui_backend.models import (
@@ -50,6 +51,7 @@ class UiServices:
     bootstrap: BootstrapService
     events: EventService | None = None
     jobs: JobService | None = None
+    artifacts: ArtifactService | None = None
 
 
 def _problem_response(status_code: int, problem: ProblemView) -> JSONResponse:
@@ -90,6 +92,10 @@ def create_app(
         )
     if services.jobs is None:
         services = replace(services, jobs=JobService(control_db))
+    if services.artifacts is None:
+        services = replace(
+            services, artifacts=ArtifactService(services.read_models, artifact_root)
+        )
 
     app = FastAPI(
         title="AI Video Factory UI",
