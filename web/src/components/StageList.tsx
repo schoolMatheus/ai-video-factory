@@ -30,11 +30,9 @@ export function StageList({
   onSelect: (stage: StageName) => void;
 }) {
   const byName = new Map(stages.map((stage) => [stage.name, stage]));
-  const completed = stages.filter((stage) => stage.status === "completed").length;
 
   return (
     <nav aria-label="Etapas da produção" className={styles.list}>
-      <p className={styles.count}>{completed} de 6 etapas concluídas</p>
       <ol>
         {ORDER.map((name) => {
           const stage = byName.get(name);

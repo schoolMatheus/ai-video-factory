@@ -1,8 +1,9 @@
 import { http, HttpResponse } from "msw";
+import type { ProductionView } from "../api/types";
 
 const BASE = "/api/v1";
 
-function production(id: string, title: string, profileId: string) {
+function production(id: string, title: string, profileId: string): ProductionView {
   return {
     id,
     mode: "legacy",
@@ -24,6 +25,16 @@ function production(id: string, title: string, profileId: string) {
 }
 
 export const capturedIdempotencyKeys: string[] = [];
+
+export let currentProduction: ProductionView = production(
+  "d".repeat(32),
+  "Produção em acompanhamento",
+  "canal-a",
+);
+
+export function setCurrentProduction(next: ProductionView): void {
+  currentProduction = next;
+}
 
 export const handlers = [
   http.get(`${BASE}/capabilities`, () =>
@@ -47,6 +58,26 @@ export const handlers = [
           : [];
     return HttpResponse.json({ items, next_cursor: null });
   }),
+  http.get(`${BASE}/productions/:id`, () =>
+    HttpResponse.json(currentProduction),
+  ),
+  http.get(`${BASE}/productions/:id/events`, () =>
+    HttpResponse.json({
+      items: [
+        {
+          id: `${currentProduction.id}:0`,
+          production_id: currentProduction.id,
+          type: "stage.started",
+          timestamp: "2026-11-23T00:00:00+00:00",
+          scope: "production",
+          severity: "info",
+          attempt: 1,
+          payload: { stage: "research" },
+        },
+      ],
+      next_cursor: null,
+    }),
+  ),
   http.post(`${BASE}/productions/preflight`, async ({ request }) => {
     const body = (await request.json()) as { topic?: string };
     return HttpResponse.json({

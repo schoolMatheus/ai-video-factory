@@ -45,6 +45,42 @@ class MemoryStorage implements Storage {
   }
 }
 
+export class FakeEventSource {
+  static instances: FakeEventSource[] = [];
+
+  onopen: (() => void) | null = null;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  readonly listeners = new Map<string, Array<() => void>>();
+
+  constructor(
+    readonly url: string,
+    readonly options?: { withCredentials?: boolean },
+  ) {
+    FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, listener: () => void): void {
+    const existing = this.listeners.get(type) ?? [];
+    existing.push(listener);
+    this.listeners.set(type, existing);
+  }
+
+  emit(type: string): void {
+    for (const listener of this.listeners.get(type) ?? []) listener();
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+}
+
+Object.defineProperty(globalThis, "EventSource", {
+  value: FakeEventSource,
+  configurable: true,
+});
+
 if (typeof globalThis.localStorage === "undefined") {
   Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage() });
 }
