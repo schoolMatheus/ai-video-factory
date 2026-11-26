@@ -56,6 +56,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/productions/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preflight
+         * @description Report real capabilities; never start an external service or render.
+         */
+        post: operations["preflight_api_v1_productions_preflight_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/productions/{production_id}": {
         parameters: {
             query?: never;
@@ -383,6 +403,16 @@ export interface components {
             /** @default queued */
             status: components["schemas"]["JobStatus"];
         };
+        /** PreflightView */
+        PreflightView: {
+            /** Actions */
+            actions?: components["schemas"]["ActionAvailability"][];
+            /** Can Start */
+            can_start: boolean;
+            /** Problems */
+            problems?: components["schemas"]["ProblemView"][];
+            through?: components["schemas"]["StageName"] | null;
+        };
         /** ProblemView */
         ProblemView: {
             /** Code */
@@ -637,6 +667,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preflight_api_v1_productions_preflight_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreflightView"];
                 };
             };
             /** @description Validation Error */

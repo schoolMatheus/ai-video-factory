@@ -15,6 +15,7 @@ export function ProductionList() {
     queryKey: queryKeys.productions(filters),
     queryFn: () =>
       listProductions({ profile_id: profileId || undefined, search: search || undefined }),
+    retry: false,
   });
 
   return (

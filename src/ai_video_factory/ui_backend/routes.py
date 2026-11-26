@@ -10,12 +10,15 @@ from fastapi.responses import StreamingResponse
 
 from ai_video_factory.ui_backend import domain
 from ai_video_factory.ui_backend.models import (
+    ActionAvailability,
     ActionRequest,
     CapabilitiesView,
     EventPage,
     JobView,
     NotFoundError,
     OperationReceipt,
+    ProblemView,
+    PreflightView,
     ProductionCreateRequest,
     ProductionFilters,
     ProductionPage,
@@ -94,6 +97,58 @@ def current_session(session: Session = Depends(session_of)) -> dict[str, object]
 @router.get("/capabilities", response_model=CapabilitiesView)
 def capabilities() -> CapabilitiesView:
     return domain.get_capabilities()
+
+
+@router.post("/productions/preflight", response_model=PreflightView)
+def preflight(payload: ProductionCreateRequest) -> PreflightView:
+    """Report real capabilities; never start an external service or render."""
+    capabilities = domain.get_capabilities()
+    problems: list[ProblemView] = []
+    actions: list[ActionAvailability] = []
+    if not capabilities.staged_flow:
+        problems.append(
+            ProblemView(
+                code="staged_flow_unavailable",
+                message="O fluxo de seis etapas ainda não está configurado neste ambiente.",
+                recoverable=True,
+                suggested_action="Acompanhe as execuções legadas ou configure o domínio.",
+            )
+        )
+        through = None
+    else:
+        through = StageName.review if capabilities.editor else StageName.media
+        if not capabilities.editor:
+            problems.append(
+                ProblemView(
+                    code="editor_unavailable",
+                    message="Edição externa não configurada; é possível chegar até mídia.",
+                    recoverable=True,
+                )
+            )
+    if not payload.topic.strip():
+        problems.append(
+            ProblemView(
+                code="topic_missing",
+                message="Informe um tema para a produção.",
+                recoverable=True,
+            )
+        )
+    for action in ("resume", "stop_after_stage", "revise_script", "replace_media", "open_editor"):
+        enabled = (
+            action in {"resume", "stop_after_stage"}
+            and capabilities.staged_flow
+            and capabilities.stop_control
+        ) or (action == "open_editor" and capabilities.editor)
+        reason = None if enabled else "Dependência de domínio ainda não disponível."
+        actions.append(
+            ActionAvailability(action=action, enabled=enabled, reason=reason)
+        )
+    return PreflightView(
+        can_start=capabilities.staged_flow and bool(payload.topic.strip()),
+        through=through,
+        actions=actions,
+        problems=problems,
+    )
 
 
 @router.post("/productions", status_code=202, response_model=OperationReceipt)

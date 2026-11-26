@@ -10,7 +10,7 @@
     "lint": "tsc -b --noEmit",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "generate:api": "python ../scripts/dump_openapi.py && openapi-typescript openapi.json -o src/api/generated.ts"
+    "generate:api": "node scripts/generate-api.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.90.2",

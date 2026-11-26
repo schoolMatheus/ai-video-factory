@@ -159,7 +159,15 @@ def test_production_snapshot_and_events(factory: _ClientFactory, tmp_path: Path)
     assert events.json()["items"][0]["type"] == "run_started"
 
 
-def test_unavailable_action_returns_structured_reason(factory: _ClientFactory, tmp_path: Path) -> None:
+def test_unavailable_action_returns_structured_reason(
+    factory: _ClientFactory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ai_video_factory.ui_backend import domain
+    from ai_video_factory.ui_backend.models import CapabilitiesView
+
+    monkeypatch.setattr(
+        domain, "get_capabilities", lambda: CapabilitiesView(api_version="v1")
+    )
     http = factory.client()
     csrf = http.cookies.get("avf_session_csrf")
     run = _make_run(tmp_path)
@@ -187,6 +195,57 @@ def test_missing_production_returns_not_found(factory: _ClientFactory) -> None:
     response = factory.client().get("/api/v1/productions/" + "0" * 32)
 
     assert response.status_code == 404
+
+
+def test_preflight_reports_missing_domain(factory: _ClientFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    from ai_video_factory.ui_backend import domain
+    from ai_video_factory.ui_backend.models import CapabilitiesView
+
+    monkeypatch.setattr(
+        domain,
+        "get_capabilities",
+        lambda: CapabilitiesView(api_version="v1"),
+    )
+    http = factory.client()
+
+    response = http.post(
+        "/api/v1/productions/preflight",
+        json={"topic": "tema"},
+        headers={"X-CSRF-Token": http.cookies.get("avf_session_csrf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["can_start"] is False
+    assert payload["through"] is None
+    assert payload["problems"][0]["code"] == "staged_flow_unavailable"
+
+
+def test_preflight_allows_partial_run_without_editor(
+    factory: _ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ai_video_factory.ui_backend import domain
+    from ai_video_factory.ui_backend.models import CapabilitiesView
+
+    monkeypatch.setattr(
+        domain,
+        "get_capabilities",
+        lambda: CapabilitiesView(api_version="v1", staged_flow=True, stop_control=True),
+    )
+    http = factory.client()
+
+    response = http.post(
+        "/api/v1/productions/preflight",
+        json={"topic": "tema"},
+        headers={"X-CSRF-Token": http.cookies.get("avf_session_csrf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["can_start"] is True
+    assert payload["through"] == "media"
+    editor = next(item for item in payload["actions"] if item["action"] == "open_editor")
+    assert editor["enabled"] is False
 
 
 def test_create_production_is_idempotent(

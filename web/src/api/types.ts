@@ -20,6 +20,7 @@ export type EventView = Schemas["EventView"];
 export type EventPage = Schemas["EventPage"];
 export type CapabilitiesView = Schemas["CapabilitiesView"];
 export type OperationReceipt = Schemas["OperationReceipt"];
+export type PreflightView = Schemas["PreflightView"];
 export type JobView = Schemas["JobView"];
 export type JobStatus = Schemas["JobStatus"];
 export type ProductionCreateRequest = Schemas["ProductionCreateRequest"];

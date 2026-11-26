@@ -3,6 +3,7 @@ import type {
   CapabilitiesView,
   EventPage,
   OperationReceipt,
+  PreflightView,
   ProductionCreateRequest,
   ProductionPage,
   ProductionView,
@@ -96,6 +97,12 @@ export function listEvents(
     "GET",
     `/productions/${encodeURIComponent(id)}/events${suffix}`,
   );
+}
+
+export function preflightProduction(
+  payload: ProductionCreateRequest,
+): Promise<PreflightView> {
+  return request<PreflightView>("POST", "/productions/preflight", { body: payload });
 }
 
 export function createProduction(

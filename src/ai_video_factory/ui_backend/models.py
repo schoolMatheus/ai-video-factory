@@ -145,6 +145,15 @@ class ProductionPage(BaseModel):
     next_cursor: str | None = None
 
 
+class PreflightView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    can_start: bool
+    through: StageName | None = None
+    actions: list[ActionAvailability] = Field(default_factory=list)
+    problems: list[ProblemView] = Field(default_factory=list)
+
+
 class EventView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
