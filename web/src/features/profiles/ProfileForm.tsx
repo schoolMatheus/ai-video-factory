@@ -9,6 +9,7 @@ const GROUPS = ["Identidade", "Pesquisa", "Roteiro", "Voz", "Mídia", "Edição"
 
 export function ProfileForm({ profile }: { profile?: ProfileView }) {
   const [name, setName] = useState(profile?.name ?? "");
+  const [niche, setNiche] = useState(profile?.niche ?? "");
   const [language, setLanguage] = useState("pt-BR");
   const [settings, setSettings] = useState(
     JSON.stringify(profile?.settings ?? {}, null, 2),
@@ -33,7 +34,7 @@ export function ProfileForm({ profile }: { profile?: ProfileView }) {
             profile_id: `perfil-${Date.now().toString(36)}`,
             name,
             language,
-            niche: "",
+            niche,
           }),
         );
       }
@@ -60,6 +61,16 @@ export function ProfileForm({ profile }: { profile?: ProfileView }) {
           Nome
           <input value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
+        {!profile && (
+          <label>
+            Nicho
+            <input
+              value={niche}
+              onChange={(event) => setNiche(event.target.value)}
+              placeholder="Ex.: astronomia"
+            />
+          </label>
+        )}
         <label>
           Idioma dos vídeos
           <input value={language} onChange={(event) => setLanguage(event.target.value)} />
