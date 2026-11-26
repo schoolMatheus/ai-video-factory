@@ -212,6 +212,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Profiles */
+        get: operations["list_profiles_api_v1_profiles_get"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_api_v1_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profiles/{profile_id}": {
         parameters: {
             query?: never;
@@ -223,6 +241,24 @@ export interface paths {
         get: operations["profile_api_v1_profiles__profile_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Revise Profile */
+        patch: operations["revise_profile_api_v1_profiles__profile_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/profiles/{profile_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Feedback */
+        post: operations["feedback_api_v1_profiles__profile_id__feedback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -240,6 +276,23 @@ export interface paths {
         get: operations["memory_api_v1_profiles__profile_id__memory_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/{profile_id}/memory/{learning_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend Learning */
+        post: operations["suspend_learning_api_v1_profiles__profile_id__memory__learning_id__suspend_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -420,6 +473,17 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /** Evidence */
+            evidence?: string[];
+            /** Production Id */
+            production_id?: string | null;
+            /** @default research */
+            stage: components["schemas"]["StageName"];
+            /** Summary */
+            summary: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -443,6 +507,43 @@ export interface components {
             result_reference?: string | null;
             /** @default unknown */
             status: components["schemas"]["JobStatus"];
+        };
+        /** MemoryPage */
+        MemoryPage: {
+            /** Items */
+            items: components["schemas"]["MemoryView"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** MemoryView */
+        MemoryView: {
+            /** After */
+            after?: string | null;
+            /** Before */
+            before?: string | null;
+            /** Condition */
+            condition?: string | null;
+            /** Evidence */
+            evidence?: string[];
+            /** Id */
+            id: string;
+            /**
+             * Origin
+             * @default observed
+             * @enum {string}
+             */
+            origin: "explicit" | "inferred" | "observed";
+            /** Profile Id */
+            profile_id: string;
+            /** Revision */
+            revision?: number | null;
+            stage?: components["schemas"]["StageName"] | null;
+            /** State */
+            state: string;
+            /** Summary */
+            summary: string;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /** OperationReceipt */
         OperationReceipt: {
@@ -544,6 +645,64 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** ProfileCreateRequest */
+        ProfileCreateRequest: {
+            /** Explicit Fields */
+            explicit_fields?: string[];
+            /** Language */
+            language: string;
+            /** Name */
+            name: string;
+            /**
+             * Niche
+             * @default
+             */
+            niche: string;
+            /** Profile Id */
+            profile_id: string;
+        };
+        /** ProfilePage */
+        ProfilePage: {
+            /** Items */
+            items: components["schemas"]["ProfileView"][];
+        };
+        /** ProfilePatchRequest */
+        ProfilePatchRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Explicit Fields */
+            explicit_fields?: string[] | null;
+            /**
+             * Reason
+             * @default Alteração pelo painel local
+             */
+            reason: string;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ProfileView */
+        ProfileView: {
+            /**
+             * Available
+             * @default true
+             */
+            available: boolean;
+            /** Explicit Fields */
+            explicit_fields?: string[];
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            problem?: components["schemas"]["ProblemView"] | null;
+            /** Revision */
+            revision: number;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
         /** Progress */
         Progress: {
             /** Completed */
@@ -591,6 +750,13 @@ export interface components {
             status: components["schemas"]["StageStatus"];
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** SuspendRequest */
+        SuspendRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Reason */
+            reason: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1032,6 +1198,59 @@ export interface operations {
             };
         };
     };
+    list_profiles_api_v1_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfilePage"];
+                };
+            };
+        };
+    };
+    create_profile_api_v1_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     profile_api_v1_profiles__profile_id__get: {
         parameters: {
             query?: never;
@@ -1049,7 +1268,77 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_profile_api_v1_profiles__profile_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfilePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_api_v1_profiles__profile_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryView"];
                 };
             };
             /** @description Validation Error */
@@ -1080,7 +1369,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MemoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspend_learning_api_v1_profiles__profile_id__memory__learning_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+                learning_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryView"];
                 };
             };
             /** @description Validation Error */

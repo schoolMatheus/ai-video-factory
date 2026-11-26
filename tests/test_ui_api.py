@@ -126,11 +126,11 @@ def test_unexpected_origin_is_rejected(factory: _ClientFactory) -> None:
     assert response.json()["code"] == "invalid_origin"
 
 
-def test_nonexistent_profile_is_not_found(factory: _ClientFactory) -> None:
+def test_profiles_endpoint_reports_unconfigured_domain(factory: _ClientFactory) -> None:
     response = factory.client().get("/api/v1/profiles/does-not-exist")
 
-    assert response.status_code == 404
-    assert response.json()["code"] == "not_found"
+    assert response.status_code == 503
+    assert response.json()["code"] == "dependency_unavailable"
 
 
 def test_cross_profile_results_are_not_returned(factory: _ClientFactory, tmp_path: Path) -> None:

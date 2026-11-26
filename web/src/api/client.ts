@@ -2,12 +2,18 @@ import { API_PREFIX } from "./types";
 import type {
   CapabilitiesView,
   EventPage,
+  FeedbackRequest,
+  MemoryPage,
   OperationReceipt,
   PreflightView,
+  ProfileCreateRequest,
+  ProfilePatchRequest,
+  ProfileView,
   ProductionCreateRequest,
   ProductionPage,
   ProductionView,
   ProblemView,
+  ProfilePage,
 } from "./types";
 
 export class ApiError extends Error {
@@ -103,6 +109,57 @@ export function preflightProduction(
   payload: ProductionCreateRequest,
 ): Promise<PreflightView> {
   return request<PreflightView>("POST", "/productions/preflight", { body: payload });
+}
+
+export function listProfiles(): Promise<ProfilePage> {
+  return request<ProfilePage>("GET", "/profiles");
+}
+
+export function getProfile(profileId: string): Promise<ProfileView> {
+  return request<ProfileView>("GET", `/profiles/${encodeURIComponent(profileId)}`);
+}
+
+export function createProfile(payload: ProfileCreateRequest): Promise<ProfileView> {
+  return request<ProfileView>("POST", "/profiles", { body: payload });
+}
+
+export function reviseProfile(
+  profileId: string,
+  payload: ProfilePatchRequest,
+): Promise<ProfileView> {
+  return request<ProfileView>(
+    "PATCH",
+    `/profiles/${encodeURIComponent(profileId)}`,
+    { body: payload },
+  );
+}
+
+export function listMemory(profileId: string): Promise<MemoryPage> {
+  return request<MemoryPage>("GET", `/profiles/${encodeURIComponent(profileId)}/memory`);
+}
+
+export function addFeedback(
+  profileId: string,
+  payload: FeedbackRequest,
+): Promise<unknown> {
+  return request<unknown>(
+    "POST",
+    `/profiles/${encodeURIComponent(profileId)}/feedback`,
+    { body: payload },
+  );
+}
+
+export function suspendLearning(
+  profileId: string,
+  learningId: string,
+  expectedRevision: number,
+  reason: string,
+): Promise<unknown> {
+  return request<unknown>(
+    "POST",
+    `/profiles/${encodeURIComponent(profileId)}/memory/${encodeURIComponent(learningId)}/suspend`,
+    { body: { expected_revision: expectedRevision, reason } },
+  );
 }
 
 export function createProduction(

@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ai_video_factory.ui_backend.artifacts import ArtifactService
 from ai_video_factory.ui_backend.events import EventService
 from ai_video_factory.ui_backend.jobs import JobService
+from ai_video_factory.ui_backend.profile_adapter import DomainProfileAdapter
 from ai_video_factory.ui_backend.models import (
     InvalidRequestError,
     ProblemView,
@@ -36,6 +37,7 @@ class UiSettings:
     project_root: Path
     data_root: Path | None = None
     control_db: Path | None = None
+    profiles_db: Path | None = None
     static_dir: Path | None = None
     bind_host: str = "127.0.0.1"
     port: int = 8765
@@ -52,6 +54,7 @@ class UiServices:
     events: EventService | None = None
     jobs: JobService | None = None
     artifacts: ArtifactService | None = None
+    profiles: object | None = None
 
 
 def _problem_response(status_code: int, problem: ProblemView) -> JSONResponse:
@@ -95,6 +98,10 @@ def create_app(
     if services.artifacts is None:
         services = replace(
             services, artifacts=ArtifactService(services.read_models, artifact_root)
+        )
+    if services.profiles is None and settings.profiles_db is not None:
+        services = replace(
+            services, profiles=DomainProfileAdapter(settings.profiles_db)
         )
 
     app = FastAPI(

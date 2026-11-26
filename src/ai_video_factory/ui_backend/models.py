@@ -145,6 +145,41 @@ class ProductionPage(BaseModel):
     next_cursor: str | None = None
 
 
+class ProfileCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    language: str = Field(min_length=2)
+    niche: str = ""
+    explicit_fields: list[str] = Field(default_factory=list)
+
+
+class ProfilePatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    settings: dict[str, Any] = Field(default_factory=dict)
+    explicit_fields: list[str] | None = None
+    reason: str = "Alteração pelo painel local"
+
+
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1)
+    stage: StageName = StageName.research
+    production_id: str | None = None
+    evidence: list[str] = Field(default_factory=list)
+
+
+class SuspendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1)
+
+
 class ProductionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -246,6 +281,13 @@ class MemoryView(BaseModel):
     after: str | None = None
     revision: int | None = None
     updated_at: str | None = None
+
+
+class MemoryPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[MemoryView]
+    next_cursor: str | None = None
 
 
 class ActionName(StrEnum):

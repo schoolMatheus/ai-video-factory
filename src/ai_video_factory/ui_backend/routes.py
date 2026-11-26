@@ -7,6 +7,7 @@ import json
 
 from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from ai_video_factory.ui_backend import domain
 from ai_video_factory.ui_backend.models import (
@@ -15,11 +16,17 @@ from ai_video_factory.ui_backend.models import (
     ArtifactView,
     CapabilitiesView,
     EventPage,
+    FeedbackRequest,
     JobView,
+    MemoryPage,
+    MemoryView,
     NotFoundError,
     OperationReceipt,
     ProblemView,
     PreflightView,
+    ProfileCreateRequest,
+    ProfilePatchRequest,
+    ProfileView,
     ProductionCreateRequest,
     ProductionFilters,
     ProductionPage,
@@ -27,6 +34,7 @@ from ai_video_factory.ui_backend.models import (
     StageName,
     StageStatus,
     StageView,
+    SuspendRequest,
 )
 from ai_video_factory.ui_backend.artifacts import ArtifactService
 from ai_video_factory.ui_backend.events import EventService
@@ -362,14 +370,63 @@ def profile_productions(profile_id: str, request: Request) -> ProductionPage:
     return models.list_productions(filters)
 
 
-@router.get("/profiles/{profile_id}")
-def profile(profile_id: str) -> None:
-    raise NotFoundError("Perfis ainda não estão disponíveis neste ambiente.")
+def profiles_of(request: Request):  # type: ignore[no-untyped-def]
+    from ai_video_factory.ui_backend.models import DependencyUnavailableError
+
+    adapter = request.app.state.services.profiles
+    if adapter is None:
+        raise DependencyUnavailableError("Perfis ainda não disponíveis neste ambiente.")
+    return adapter
 
 
-@router.get("/profiles/{profile_id}/memory")
-def memory(profile_id: str) -> None:
-    raise NotFoundError("Memória de perfil ainda não está disponível neste ambiente.")
+class ProfilePage(BaseModel):
+    items: list[ProfileView]
+
+
+@router.get("/profiles", response_model=ProfilePage)
+def list_profiles(request: Request) -> ProfilePage:
+    return ProfilePage(items=profiles_of(request).list_profiles())
+
+
+@router.post("/profiles", status_code=201, response_model=ProfileView)
+def create_profile(payload: ProfileCreateRequest, request: Request) -> ProfileView:
+    return profiles_of(request).create_profile(payload)
+
+
+@router.get("/profiles/{profile_id}", response_model=ProfileView)
+def profile(profile_id: str, request: Request) -> ProfileView:
+    return profiles_of(request).get_profile(profile_id)
+
+
+@router.patch("/profiles/{profile_id}", response_model=ProfileView)
+def revise_profile(
+    profile_id: str, payload: ProfilePatchRequest, request: Request
+) -> ProfileView:
+    return profiles_of(request).revise_profile(profile_id, payload)
+
+
+@router.get("/profiles/{profile_id}/memory", response_model=MemoryPage)
+def memory(profile_id: str, request: Request) -> MemoryPage:
+    return MemoryPage(items=profiles_of(request).list_memory(profile_id))
+
+
+@router.post("/profiles/{profile_id}/feedback", status_code=201, response_model=MemoryView)
+def feedback(
+    profile_id: str, payload: FeedbackRequest, request: Request
+) -> MemoryView:
+    return profiles_of(request).add_feedback(profile_id, payload)
+
+
+@router.post(
+    "/profiles/{profile_id}/memory/{learning_id}/suspend",
+    response_model=MemoryView,
+)
+def suspend_learning(
+    profile_id: str, learning_id: str, payload: SuspendRequest, request: Request
+) -> MemoryView:
+    return profiles_of(request).suspend_learning(
+        profile_id, learning_id, payload.expected_revision, payload.reason
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobView)
