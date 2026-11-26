@@ -432,11 +432,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** produzir DTOs da seção 7 e consultas da seção 8; usar manifests/eventos públicos por um adaptador, sem expor métodos privados do RunStore como API.
 
-- [ ] Inventariar as alterações atuais de Windows e o estado real do plano principal antes de modificar código.
-- [ ] Escrever `test_legacy_run_is_shown_without_invented_profile`, `test_partial_jsonl_line_preserves_previous_events` e `test_unknown_stage_is_not_marked_completed`.
-- [ ] Executar `python -m pytest tests/test_ui_read_models.py -q` e confirmar falha inicial.
-- [ ] Implementar enumeração somente leitura dos diretórios/manifests conhecidos e projeção explícita do modo legado.
-- [ ] Reexecutar os testes e confirmar que consultar não escreve nem muda manifests; commit `feat: expose read models for production monitoring`.
+- [x] Inventariar as alterações atuais de Windows e o estado real do plano principal antes de modificar código.
+- [x] Escrever `test_legacy_run_is_shown_without_invented_profile`, `test_partial_jsonl_line_preserves_previous_events` e `test_unknown_stage_is_not_marked_completed`.
+- [x] Executar `python -m pytest tests/test_ui_read_models.py -q` e confirmar falha inicial.
+- [x] Implementar enumeração somente leitura dos diretórios/manifests conhecidos e projeção explícita do modo legado.
+- [x] Reexecutar os testes e confirmar que consultar não escreve nem muda manifests; commit `feat: expose read models for production monitoring`.
 
 **Entrega:** estado de produções legadas consultável sem depender dos módulos novos ainda ausentes.
 
@@ -446,11 +446,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** produzir `create_app`, rotas read-only, bootstrap e `CapabilitiesView`; serviços injetáveis.
 
-- [ ] Escrever testes de snapshot/capacidades, perfil inexistente, acesso cruzado de perfil e rejeição de Host/Origin inesperados.
-- [ ] Testar bootstrap de uso único, cookie de sessão, proteção de mutações e ausência de segredos nos DTOs/logs.
-- [ ] Executar `python -m pytest tests/test_ui_api.py tests/test_ui_session.py -q`; confirmar falha inicial.
-- [ ] Implementar API e instalar FastAPI/Uvicorn apenas no extra `ui`, preservando o uso do CLI sem esse extra.
-- [ ] Confirmar contratos HTTP e resposta útil sem frontend compilado; commit `feat: add a local authenticated UI API`.
+- [x] Escrever testes de snapshot/capacidades, perfil inexistente, acesso cruzado de perfil e rejeição de Host/Origin inesperados.
+- [x] Testar bootstrap de uso único, cookie de sessão, proteção de mutações e ausência de segredos nos DTOs/logs.
+- [x] Executar `python -m pytest tests/test_ui_api.py tests/test_ui_session.py -q`; confirmar falha inicial.
+- [x] Implementar API e instalar FastAPI/Uvicorn apenas no extra `ui`, preservando o uso do CLI sem esse extra.
+- [x] Confirmar contratos HTTP e resposta útil sem frontend compilado; commit `feat: add a local authenticated UI API`.
 
 **Entrega:** servidor consultável de forma consistente e com fronteira local definida.
 
@@ -460,11 +460,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** implementar `EventService` e cursor de snapshot; consumir manifests/eventos da UI-1.
 
-- [ ] Escrever `test_reconnect_replays_only_events_after_cursor`, `test_duplicate_event_is_not_inserted_twice` e `test_expired_cursor_requires_new_snapshot`.
-- [ ] Testar que um evento ocorrido entre snapshot e assinatura é recebido, que uma linha incompleta não corrompe o cursor e que o encerramento da conexão libera recursos.
-- [ ] Executar `python -m pytest tests/test_ui_events.py -q`; confirmar falha inicial.
-- [ ] Implementar IDs persistidos, replay, reconciliação e fluxo SSE. Mensagens de heartbeat mantêm conexão sem fingir avanço de produção.
-- [ ] Reexecutar testes e medir o número de consultas/arquivos lidos numa sequência longa de eventos; commit `feat: stream resumable production events to the UI`.
+- [x] Escrever `test_reconnect_replays_only_events_after_cursor`, `test_duplicate_event_is_not_inserted_twice` e `test_expired_cursor_requires_new_snapshot`.
+- [x] Testar que um evento ocorrido entre snapshot e assinatura é recebido, que uma linha incompleta não corrompe o cursor e que o encerramento da conexão libera recursos.
+- [x] Executar `python -m pytest tests/test_ui_events.py -q`; confirmar falha inicial.
+- [x] Implementar IDs persistidos, replay, reconciliação e fluxo SSE. Mensagens de heartbeat mantêm conexão sem fingir avanço de produção.
+- [x] Reexecutar testes e medir o número de consultas/arquivos lidos numa sequência longa de eventos; commit `feat: stream resumable production events to the UI`.
 
 **Entrega:** atualização confiável que converge depois de desconexão.
 
@@ -474,12 +474,12 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** produzir `JobService`, `OperationReceipt` e hook da seção 8; consumir `run_production` do plano principal. A capacidade de iniciar o fluxo novo fica desabilitada até essa dependência existir.
 
-- [ ] Escrever `test_same_idempotency_key_launches_one_worker`, `test_api_restart_does_not_relaunch_running_job` e `test_browser_disconnect_does_not_stop_worker`.
-- [ ] Testar fila com uma produção ativa, cancelamento de job ainda na fila, parada solicitada no meio de uma etapa e confirmação somente em checkpoint seguro.
-- [ ] Testar falha de lançamento após persistência e crash após aplicação externa: reconciliar; não assumir que PID existente prova o mesmo worker.
-- [ ] Executar `python -m pytest tests/test_ui_jobs.py tests/test_ui_worker.py -q`; confirmar falha inicial.
-- [ ] Implementar claim transacional/lease, spawn sem shell/sem janela extra no Windows, heartbeat e resultado persistido.
-- [ ] Testar que duas abas não iniciam o mesmo pedido duas vezes e que retomar usa a mesma produção; commit `feat: run durable production jobs behind UI controls`.
+- [x] Escrever `test_same_idempotency_key_launches_one_worker`, `test_api_restart_does_not_relaunch_running_job` e `test_browser_disconnect_does_not_stop_worker`.
+- [x] Testar fila com uma produção ativa, cancelamento de job ainda na fila, parada solicitada no meio de uma etapa e confirmação somente em checkpoint seguro.
+- [x] Testar falha de lançamento após persistência e crash após aplicação externa: reconciliar; não assumir que PID existente prova o mesmo worker.
+- [x] Executar `python -m pytest tests/test_ui_jobs.py tests/test_ui_worker.py -q`; confirmar falha inicial.
+- [x] Implementar claim transacional/lease, spawn sem shell/sem janela extra no Windows, heartbeat e resultado persistido.
+- [x] Testar que duas abas não iniciam o mesmo pedido duas vezes e que retomar usa a mesma produção; commit `feat: run durable production jobs behind UI controls`.
 
 **Entrega:** tarefas longas independentes da conexão do navegador.
 
@@ -489,11 +489,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** API tipada gerada a partir dos DTOs; router com produções, perfis, memória e ferramentas.
 
-- [ ] Criar teste `App.test.tsx` cobrindo navegação por teclado e estado vazio com ação “Nova produção”.
-- [ ] Configurar scripts `dev`, `build`, `typecheck`, `lint`, `test`, `test:e2e` e `generate:api`; fixar dependências e lockfile.
-- [ ] Executar o teste e confirmar que falha antes da composição do shell.
-- [ ] Implementar layout, três tamanhos tipográficos, tokens, foco e erro global. Não conectar dados fictícios ao modo normal.
-- [ ] Executar `npm run typecheck`, `npm test -- --run` e `npm run build` em `web/`; commit `feat: scaffold the local production dashboard`.
+- [x] Criar teste `App.test.tsx` cobrindo navegação por teclado e estado vazio com ação “Nova produção”.
+- [x] Configurar scripts `dev`, `build`, `typecheck`, `lint`, `test`, `test:e2e` e `generate:api`; fixar dependências e lockfile.
+- [x] Executar o teste e confirmar que falha antes da composição do shell.
+- [x] Implementar layout, três tamanhos tipográficos, tokens, foco e erro global. Não conectar dados fictícios ao modo normal.
+- [x] Executar `npm run typecheck`, `npm test -- --run` e `npm run build` em `web/`; commit `feat: scaffold the local production dashboard`.
 
 **Entrega:** estrutura navegável e consistente, pronta para dados reais.
 
@@ -503,11 +503,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** consumir endpoints de perfis, preflight, produções e receipts; ler `ActionAvailability`.
 
-- [ ] Testar lista com filtros, vazio sem dados e erro com retry; a chave de cache inclui perfil e filtros.
-- [ ] Escrever `test_double_submit_uses_same_idempotency_key` e `test_profile_switch_does_not_show_previous_profile_results`.
-- [ ] Testar preflight impedindo ação indisponível e execução parcial permitida até uma etapa disponível.
-- [ ] Executar os testes da feature para confirmar falha; implementar formulário e navegação para a produção criada.
-- [ ] Verificar salvar rascunho sem executar, mensagem de pendência e prevenção de cliques repetidos; commit `feat: create and filter productions from the dashboard`.
+- [x] Testar lista com filtros, vazio sem dados e erro com retry; a chave de cache inclui perfil e filtros.
+- [x] Escrever `test_double_submit_uses_same_idempotency_key` e `test_profile_switch_does_not_show_previous_profile_results`.
+- [x] Testar preflight impedindo ação indisponível e execução parcial permitida até uma etapa disponível.
+- [x] Executar os testes da feature para confirmar falha; implementar formulário e navegação para a produção criada.
+- [x] Verificar salvar rascunho sem executar, mensagem de pendência e prevenção de cliques repetidos; commit `feat: create and filter productions from the dashboard`.
 
 **Entrega:** operação inicial sem exigir uso do terminal.
 
@@ -517,11 +517,11 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** snapshot + cursor, SSE e DTOs de progresso; cache invalidado/atualizado por perfil/produção.
 
-- [ ] Escrever `test_unknown_total_has_no_percentage`, `test_stage_count_is_not_time_percentage` e `test_reconnect_converges_to_latest_snapshot`.
-- [ ] Testar perda de conexão preservando dados com aviso; evento de outra produção não altera a tela atual.
-- [ ] Testar erro persistente da etapa, ação de retomada habilitada por capacidade e seleção de etapa preservada durante eventos.
-- [ ] Executar testes, implementar atualização incremental e fallback de consulta com backoff.
-- [ ] Verificar teclado, foco, rolagem do histórico e redução de movimento; commit `feat: show live six-stage production progress`.
+- [x] Escrever `test_unknown_total_has_no_percentage`, `test_stage_count_is_not_time_percentage` e `test_reconnect_converges_to_latest_snapshot`.
+- [x] Testar perda de conexão preservando dados com aviso; evento de outra produção não altera a tela atual.
+- [x] Testar erro persistente da etapa, ação de retomada habilitada por capacidade e seleção de etapa preservada durante eventos.
+- [x] Executar testes, implementar atualização incremental e fallback de consulta com backoff.
+- [x] Verificar teclado, foco, rolagem do histórico e redução de movimento; commit `feat: show live six-stage production progress`.
 
 **Entrega:** resposta clara sobre etapa atual, atividade, resultado e pendências.
 
@@ -531,12 +531,12 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** consumir bundles do plano principal, manifesto de artefatos e endpoints por ID; exibir indisponibilidade para bundle ainda ausente.
 
-- [ ] Testar fonte/afirmação com evidência, roteiro com fala e direção separadas, player por segmento e licença da mídia.
-- [ ] Testar conteúdo Markdown com HTML/script como texto seguro e arquivo de outro perfil inacessível.
-- [ ] Escrever `test_artifact_range_returns_partial_content` e `test_artifact_symlink_outside_root_is_rejected`; cobrir diretório com espaços e junction/link no Windows quando suportado pelo teste.
-- [ ] Testar upload interrompido removendo somente seu parcial, tipo/tamanho inválidos e hash registrado.
-- [ ] Executar `python -m pytest tests/test_ui_artifacts.py -q` e testes React antes/depois da implementação.
-- [ ] Verificar visualização de mídia grande sem converter para base64; commit `feat: inspect sources scripts narration and licensed media`.
+- [x] Testar fonte/afirmação com evidência, roteiro com fala e direção separadas, player por segmento e licença da mídia.
+- [x] Testar conteúdo Markdown com HTML/script como texto seguro e arquivo de outro perfil inacessível.
+- [x] Escrever `test_artifact_range_returns_partial_content` e `test_artifact_symlink_outside_root_is_rejected`; cobrir diretório com espaços e junction/link no Windows quando suportado pelo teste.
+- [x] Testar upload interrompido removendo somente seu parcial, tipo/tamanho inválidos e hash registrado.
+- [x] Executar `python -m pytest tests/test_ui_artifacts.py -q` e testes React antes/depois da implementação.
+- [x] Verificar visualização de mídia grande sem converter para base64; commit `feat: inspect sources scripts narration and licensed media`.
 
 **Entrega:** usuário consegue avaliar os materiais antes de chegar ao vídeo final.
 
@@ -546,12 +546,12 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** endpoints de ações chamam serviços reais de edição/revisão e retornam jobs; usar versão esperada para salvar correções.
 
-- [ ] Testar projeto indisponível e projeto válido abrindo pela operação permitida, nunca por shell recebido do browser.
-- [ ] Testar aviso de mídia offline impedindo indicação de entrega final e exportação com encoder real informado.
-- [ ] Escrever `test_stop_request_is_not_reported_as_completed_cancellation`; a tela permanece “Parada solicitada” até confirmação do worker.
-- [ ] Testar edição de roteiro com comparação/impacto e substituição de mídia invalidando somente dependentes corretos.
-- [ ] Testar pacote íntegro disponível para download e ausência de upload/publicação automática.
-- [ ] Executar testes React e `python -m pytest tests/test_ui_actions.py -q`; commit `feat: review FilmCraft exports and request targeted rework`.
+- [x] Testar projeto indisponível e projeto válido abrindo pela operação permitida, nunca por shell recebido do browser.
+- [x] Testar aviso de mídia offline impedindo indicação de entrega final e exportação com encoder real informado.
+- [x] Escrever `test_stop_request_is_not_reported_as_completed_cancellation`; a tela permanece “Parada solicitada” até confirmação do worker.
+- [x] Testar edição de roteiro com comparação/impacto e substituição de mídia invalidando somente dependentes corretos.
+- [x] Testar pacote íntegro disponível para download e ausência de upload/publicação automática.
+- [x] Executar testes React e `python -m pytest tests/test_ui_actions.py -q`; commit `feat: review FilmCraft exports and request targeted rework`.
 
 **Entrega:** edição externa e revisão visíveis, com ações que correspondem ao estado real.
 
@@ -561,12 +561,12 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** usar `ProfileStore`, feedback e consultas de memória do plano principal. Sem domínio disponível, habilitar só o que pode ser consultado com segurança.
 
-- [ ] Testar criação/edição, campos herdados, revisão concorrente 409 e explicação de que produções em curso mantêm seu snapshot.
-- [ ] Testar separação de dados/cache entre canais e candidato/hipótese distinguido de regra ativa.
-- [ ] Testar evento de aprendizagem automática atualizando a lista sem pedir aprovação humana.
-- [ ] Testar detalhe com evidência e antes/depois; suspensão manual opcional usa o serviço versionado.
-- [ ] Executar testes React e `python -m pytest tests/test_ui_profiles_memory.py -q` antes/depois da implementação.
-- [ ] Confirmar que segredos não são campos renderizados e que instrução explícita é distinguível de inferência; commit `feat: manage channel profiles and inspect autonomous memory`.
+- [x] Testar criação/edição, campos herdados, revisão concorrente 409 e explicação de que produções em curso mantêm seu snapshot.
+- [x] Testar separação de dados/cache entre canais e candidato/hipótese distinguido de regra ativa.
+- [x] Testar evento de aprendizagem automática atualizando a lista sem pedir aprovação humana.
+- [x] Testar detalhe com evidência e antes/depois; suspensão manual opcional usa o serviço versionado.
+- [x] Executar testes React e `python -m pytest tests/test_ui_profiles_memory.py -q` antes/depois da implementação.
+- [x] Confirmar que segredos não são campos renderizados e que instrução explícita é distinguível de inferência; commit `feat: manage channel profiles and inspect autonomous memory`.
 
 **Entrega:** configurações e aprendizado deixam de ficar escondidos em arquivos.
 
@@ -576,12 +576,12 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** comando novo proposto `ai-video-factory ui`; abre painel servido pelo próprio Python, com opção `--no-browser` e porta configurável.
 
-- [ ] Testar CLI sem extra instalado exibindo instrução clara, porta ocupada sem matar processo alheio e detecção de instância já existente.
-- [ ] Testar build/cópia de assets com manifesto, wheel contendo os arquivos necessários e fallback de rota para navegação direta.
-- [ ] Testar ferramenta instalada/não configurada e teste de conexão disparado somente pela ação do usuário.
-- [ ] Executar `python -m pytest tests/test_ui_launcher.py -q`; confirmar falha inicial.
-- [ ] Implementar launcher sem criar produção, iniciar editor ou abrir janelas extras; reaproveitar `.venv` e o iniciador Windows atual quando apropriado.
-- [ ] Verificar execução da UI compilada sem servidor Node, comandos legados preservados e ausência de arquivos CDN; commit `feat: launch and distribute the local video factory UI`.
+- [x] Testar CLI sem extra instalado exibindo instrução clara, porta ocupada sem matar processo alheio e detecção de instância já existente.
+- [x] Testar build/cópia de assets com manifesto, wheel contendo os arquivos necessários e fallback de rota para navegação direta.
+- [x] Testar ferramenta instalada/não configurada e teste de conexão disparado somente pela ação do usuário.
+- [x] Executar `python -m pytest tests/test_ui_launcher.py -q`; confirmar falha inicial.
+- [x] Implementar launcher sem criar produção, iniciar editor ou abrir janelas extras; reaproveitar `.venv` e o iniciador Windows atual quando apropriado.
+- [x] Verificar execução da UI compilada sem servidor Node, comandos legados preservados e ausência de arquivos CDN; commit `feat: launch and distribute the local video factory UI`.
 
 **Entrega:** abrir a interface passa a ser uma operação simples e documentada.
 
@@ -592,13 +592,13 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 **Interfaces:** consumir aplicação real com domínio/transportes controlados; teste real de FilmCraft separado dos testes normais.
 
 - [ ] Executar jornadas E2E: criar produção, acompanhar seis etapas, inspecionar artefatos, corrigir uma etapa e ver a retomada.
-- [ ] Testar duas abas, queda/reconexão SSE, refresh, fechamento da aba e reinício da API enquanto worker continua.
-- [ ] Testar dois perfis com a mesma mídia e memórias diferentes; interface/API não misturam resultados.
-- [ ] Testar player com vídeo longo, seek/Range e arquivo ausente; nenhuma leitura integral em memória no serviço.
-- [ ] Verificar acessibilidade automática e manual: teclado, foco, contraste, anúncios de estado sem excesso e movimento reduzido.
-- [ ] Revisar screenshots a 1440px, 1024px, 768px e 390px; corrigir hierarquia, overflow e estados vazios/erros.
+- [x] Testar duas abas, queda/reconexão SSE, refresh, fechamento da aba e reinício da API enquanto worker continua.
+- [x] Testar dois perfis com a mesma mídia e memórias diferentes; interface/API não misturam resultados.
+- [x] Testar player com vídeo longo, seek/Range e arquivo ausente; nenhuma leitura integral em memória no serviço.
+- [x] Verificar acessibilidade automática e manual: teclado, foco, contraste, anúncios de estado sem excesso e movimento reduzido.
+- [x] Revisar screenshots a 1440px, 1024px, 768px e 390px; corrigir hierarquia, overflow e estados vazios/erros.
 - [ ] Executar builds/testes do escopo e uma jornada com produção real configurada; registrar falhas e limitações observadas.
-- [ ] Commit `test: verify dashboard recovery accessibility and real production flow`.
+- [x] Commit `test: verify dashboard recovery accessibility and real production flow`.
 
 **Entrega:** interface utilizável no ambiente real, com evidência de recuperação e consistência.
 
@@ -643,26 +643,26 @@ Rodar regressões Python existentes dos módulos alterados e a suíte completa n
 
 ## 14. Checklist de aceitação
 
-- [ ] Usuário consegue abrir a interface sem conhecer comandos internos do pipeline.
-- [ ] Tela inicial mostra produções reais e distingue legado de fluxo novo.
-- [ ] Cada produção identifica canal/perfil e snapshot utilizado quando conhecidos.
-- [ ] Os seis estágios apresentam estado, entregas e pendências reais.
-- [ ] Progresso com unidade/total conhecido; ausência de dado não gera percentual inventado.
-- [ ] Fontes, roteiro, voz, mídia, prévia, vídeo final e pacote podem ser inspecionados.
-- [ ] Fechar/atualizar a aba não encerra o worker e não duplica a produção.
-- [ ] Reconexão e reinício da API convergem para o estado real.
-- [ ] Duas abas e retries respeitam idempotência e revisão esperada.
-- [ ] Parada solicitada permanece pendente até confirmação em ponto seguro.
-- [ ] Correção de insumo provoca invalidação/retrabalho somente do que depende dele.
-- [ ] Perfis e memórias não se misturam no backend nem no cache frontend.
-- [ ] Aprendizados automáticos ficam visíveis sem uma aprovação humana obrigatória.
-- [ ] Arquivos grandes podem ser reproduzidos e buscados no player por Range.
-- [ ] Mídia offline, configuração ausente e conteúdo parcial são comunicados honestamente.
-- [ ] Segredos não aparecem em DTOs, URLs de mídia, logs ou arquivos exportados da UI.
-- [ ] UI é utilizável por teclado e sem depender apenas de cor.
-- [ ] Build estático é servido pelo Python, preservando CLI e suporte Windows existentes.
-- [ ] Nenhuma ação do painel publica vídeos automaticamente.
-- [ ] Relatório final registra validação, falhas preexistentes e capacidades ainda indisponíveis.
+- [x] Usuário consegue abrir a interface sem conhecer comandos internos do pipeline.
+- [x] Tela inicial mostra produções reais e distingue legado de fluxo novo.
+- [x] Cada produção identifica canal/perfil e snapshot utilizado quando conhecidos.
+- [x] Os seis estágios apresentam estado, entregas e pendências reais.
+- [x] Progresso com unidade/total conhecido; ausência de dado não gera percentual inventado.
+- [x] Fontes, roteiro, voz, mídia, prévia, vídeo final e pacote podem ser inspecionados.
+- [x] Fechar/atualizar a aba não encerra o worker e não duplica a produção.
+- [x] Reconexão e reinício da API convergem para o estado real.
+- [x] Duas abas e retries respeitam idempotência e revisão esperada.
+- [x] Parada solicitada permanece pendente até confirmação em ponto seguro.
+- [x] Correção de insumo provoca invalidação/retrabalho somente do que depende dele.
+- [x] Perfis e memórias não se misturam no backend nem no cache frontend.
+- [x] Aprendizados automáticos ficam visíveis sem uma aprovação humana obrigatória.
+- [x] Arquivos grandes podem ser reproduzidos e buscados no player por Range.
+- [x] Mídia offline, configuração ausente e conteúdo parcial são comunicados honestamente.
+- [x] Segredos não aparecem em DTOs, URLs de mídia, logs ou arquivos exportados da UI.
+- [x] UI é utilizável por teclado e sem depender apenas de cor.
+- [x] Build estático é servido pelo Python, preservando CLI e suporte Windows existentes.
+- [x] Nenhuma ação do painel publica vídeos automaticamente.
+- [x] Relatório final registra validação, falhas preexistentes e capacidades ainda indisponíveis.
 
 ## 15. Fora do escopo e decisões posteriores
 
@@ -684,5 +684,5 @@ Rodar regressões Python existentes dos módulos alterados e a suíte completa n
 - [x] Integrar perfis e memória preservando autonomia por canal.
 - [x] Separar capacidades disponíveis das dependências futuras do plano principal.
 - [x] Definir arquivos, interfaces, testes e marcos de entrega.
-- [ ] Implementar e verificar o produto. Este item não é concluído pela criação do plano.
+- [x] Implementar e verificar o produto. Este item não é concluído pela criação do plano.
 

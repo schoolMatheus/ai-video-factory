@@ -79,11 +79,28 @@ Back-end:
 python -m pytest tests/test_ui_*.py -q
 ```
 
+### Testes de ponta a ponta
+
+```powershell
+cd web
+npm.cmd run test:e2e
+```
+
+O Playwright inicia `scripts/e2e_serve.py`, um servidor somente loopback que
+cria artefatos e perfis de teste em um diretório temporário. Os cenários cobrem
+abertura do painel, recuperação após atualização e separação de memórias entre
+canais.
+
 ### Estado observado nesta entrega
 
 - Suíte da interface: 81 testes Python e 28 testes React aprovados; um teste de
   symlink é ignorado quando o Windows não concede o privilégio necessário.
 - Geração de tipos, `typecheck` e `build` concluídos sem erros.
+- Os três cenários Playwright foram criados e listados pelo runner, mas não
+  executados: o download do `chromium_headless_shell` não concluiu neste
+  ambiente. O servidor controlado `scripts/e2e_serve.py` iniciou corretamente.
+- A suíte completa do repositório foi iniciada, mas não terminou dentro do prazo
+  desta sessão; a suíte específica da interface (85 testes) passou.
 - Nenhum upload/publicação automático foi adicionado.
 - Limitações registradas: execução real das etapas depende dos runners do plano
   principal; integração FilmCraft depende de configuração local; a suíte completa

@@ -50,6 +50,9 @@ export function ProfileList() {
           </tbody>
         </table>
       )}
+      {list.isSuccess && list.data.items.length === 0 && (
+        <p>Nenhum perfil cadastrado neste ambiente.</p>
+      )}
       {selected.data && <ProfileForm profile={selected.data} />}
       {!selectedId && <ProfileForm />}
     </section>
