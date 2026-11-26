@@ -39,6 +39,8 @@ assets/music/*.flac
 # local UI control state and generated artifacts
 data/ui/
 web/dist/
+web/test-results/
+web/playwright-report/
 web/openapi.json
 web/*.log
 web/*.tsbuildinfo
