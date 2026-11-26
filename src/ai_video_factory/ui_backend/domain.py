@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import shutil
+import subprocess
+from pathlib import Path
 
+from ai_video_factory.sanitization import sanitize_diagnostic
 from ai_video_factory.ui_backend.models import (
     ActionName,
     ActionRequest,
@@ -154,6 +158,65 @@ def execute_action(
         note="Retrabalho solicitado; a execução acontece no worker.",
         invalidated_stages=invalidation_plan(changed) if changed else [],
     )
+
+
+_TOOL_COMMANDS = {
+    "ffmpeg": ["ffmpeg", "-version"],
+    "ffprobe": ["ffprobe", "-version"],
+    "node": ["node", "--version"],
+    "filmcraft": [],
+    "llm": [],
+}
+
+
+def get_tools() -> list[dict[str, object]]:
+    """Report observed installation/configuration without running any probe."""
+    tools: list[dict[str, object]] = []
+    for tool_id, command in _TOOL_COMMANDS.items():
+        if command:
+            state = "installed" if shutil.which(command[0]) else "not_installed"
+        else:
+            config_path = Path.cwd() / "config" / (
+                "filmcraft.toml" if tool_id == "filmcraft" else "inference.toml"
+            )
+            state = "configured" if config_path.is_file() else "not_configured"
+        tools.append(
+            {
+                "id": tool_id,
+                "state": state,
+                "note": "Teste de conexão disponível sob ação explícita.",
+            }
+        )
+    return tools
+
+
+def check_tool(tool_id: str) -> dict[str, object]:
+    """Perform one explicit, bounded probe; never echo secrets."""
+    if tool_id not in _TOOL_COMMANDS:
+        raise DependencyUnavailableError("Ferramenta desconhecida.")
+    command = _TOOL_COMMANDS[tool_id]
+    if not command:
+        return {"id": tool_id, "state": "not_verified", "observed": "sem comando de teste"}
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return {
+            "id": tool_id,
+            "state": "unavailable",
+            "observed": sanitize_diagnostic(error)[:200],
+        }
+    first_line = (result.stdout or result.stderr).splitlines()[:1]
+    return {
+        "id": tool_id,
+        "state": "validated" if result.returncode == 0 else "unavailable",
+        "observed": sanitize_diagnostic(first_line[0] if first_line else "sem saída")[:200],
+    }
 
 
 def require_capability(capability: str) -> None:

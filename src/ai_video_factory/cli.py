@@ -47,6 +47,17 @@ app.add_typer(review_app, name="review")
 app.add_typer(profile_app, name="profiles")
 app.add_typer(workflow_app, name="workflow")
 
+
+@app.command("ui")
+def ui_command(
+    port: int = typer.Option(8765, "--port", help="Porta local do painel."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Não abrir o navegador."),
+) -> None:
+    """Abre o painel local servido pelo próprio Python."""
+    from ai_video_factory.ui_cli import main as run_ui
+
+    raise SystemExit(run_ui(["--port", str(port), "--no-browser"] if no_browser else ["--port", str(port)]))
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DATA_ROOT = _PROJECT_ROOT / "data"
 _MODEL_IDENTIFIER = "avf-qwen36-executor"

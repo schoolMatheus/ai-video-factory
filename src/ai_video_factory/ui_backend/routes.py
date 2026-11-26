@@ -429,6 +429,16 @@ def suspend_learning(
     )
 
 
+@router.get("/tools")
+def tools() -> dict[str, object]:
+    return {"items": domain.get_tools()}
+
+
+@router.post("/tools/{tool_id}/check")
+def check_tool(tool_id: str) -> dict[str, object]:
+    return domain.check_tool(tool_id)
+
+
 @router.get("/jobs/{job_id}", response_model=JobView)
 def job(job_id: str, request: Request) -> JobView:
     return jobs_of(request).get_job(job_id)

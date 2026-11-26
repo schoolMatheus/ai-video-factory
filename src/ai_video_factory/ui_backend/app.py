@@ -8,7 +8,8 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ai_video_factory.ui_backend.artifacts import ArtifactService
@@ -200,4 +201,27 @@ def create_app(
         return _problem_response(problem.status_code, problem.as_problem())
 
     app.include_router(router)
+
+    static_dir = Path(settings.static_dir) if settings.static_dir else None
+    assets_dir = static_dir / "assets" if static_dir else None
+    if assets_dir is not None and assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="ui-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_fallback(full_path: str):  # noqa: ARG001
+        if full_path.startswith("api/"):
+            from ai_video_factory.ui_backend.models import NotFoundError
+
+            raise NotFoundError("Endpoint não encontrado.")
+        index = static_dir / "index.html" if static_dir else None
+        if index is not None and index.is_file():
+            return FileResponse(index)
+        return HTMLResponse(
+            "<!doctype html><html lang='pt-BR'><body>"
+            "<h1>Interface não compilada</h1>"
+            "<p>Rode npm run build em web/ ou use o pacote distribuído.</p>"
+            "</body></html>",
+            status_code=503,
+        )
+
     return app

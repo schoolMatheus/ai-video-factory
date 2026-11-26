@@ -62,6 +62,20 @@ TTS model. Producing a video from a topic also requires configuring narration,
 an OpenAI-compatible model endpoint, and media sources. See
 [Windows setup and limitations](docs/windows.md).
 
+### Interface gráfica (local)
+
+O painel abre no navegador com o mesmo ambiente Python; Node não precisa
+continuar rodando depois do build:
+
+```powershell
+python -m uv sync --extra ui
+ai-video-factory ui --no-browser
+```
+
+O comando imprime uma URL com um token de uso único. Consulte
+[docs/interface-grafica.md](docs/interface-grafica.md) para build, recuperação
+e limitações.
+
 ## Staged workflow (opt-in)
 
 A second, versioned production path is available alongside the legacy
