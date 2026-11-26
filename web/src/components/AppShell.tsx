@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import styles from "./AppShell.module.css";
 
 const LINKS = [
-  { to: "/", label: "Produções" },
+  { to: "/", label: "Início" },
+  { to: "/producoes", label: "Produções" },
   { to: "/perfis", label: "Perfis" },
   { to: "/memoria", label: "Memória" },
   { to: "/ferramentas", label: "Ferramentas" },

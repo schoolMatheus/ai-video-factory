@@ -6,8 +6,8 @@ import { App } from "./App";
 import { Providers } from "./providers";
 import { routes } from "./router";
 
-function renderApp() {
-  const router = createMemoryRouter(routes, { initialEntries: ["/"] });
+function renderApp(initialEntry = "/") {
+  const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
   return render(
     <Providers>
       <App router={router} />
@@ -24,11 +24,11 @@ describe("App shell", () => {
 
     expect(screen.getByRole("link", { name: "Ir para o conteúdo" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("link", { name: "Produções" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Início" })).toHaveFocus();
   });
 
   it("mostra estado vazio com ação Nova produção", async () => {
-    renderApp();
+    renderApp("/producoes");
 
     expect(await screen.findByText("Nenhuma produção ainda.")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Nova produção" }).length).toBeGreaterThan(0);
@@ -36,7 +36,7 @@ describe("App shell", () => {
 
   it("oferece limpar filtro quando não há resultados para o filtro", async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderApp("/producoes");
 
     await user.type(screen.getByLabelText("Canal"), "canal-inexistente");
 

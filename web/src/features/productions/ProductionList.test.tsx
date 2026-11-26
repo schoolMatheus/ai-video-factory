@@ -9,7 +9,7 @@ import { routes } from "../../app/router";
 import { server } from "../../test/setup";
 
 function renderList() {
-  const router = createMemoryRouter(routes, { initialEntries: ["/"] });
+  const router = createMemoryRouter(routes, { initialEntries: ["/producoes"] });
   return render(
     <Providers>
       <App router={router} />
