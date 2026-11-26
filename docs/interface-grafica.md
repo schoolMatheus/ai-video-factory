@@ -99,8 +99,8 @@ canais.
 - Os três cenários Playwright foram criados e listados pelo runner, mas não
   executados: o download do `chromium_headless_shell` não concluiu neste
   ambiente. O servidor controlado `scripts/e2e_serve.py` iniciou corretamente.
-- A suíte completa do repositório foi iniciada, mas não terminou dentro do prazo
-  desta sessão; a suíte específica da interface (85 testes) passou.
+- Suíte completa do repositório: 1207 testes passaram, 7 foram ignorados e
+  nenhum falhou. A suíte específica da interface (85 testes) passou.
 - Nenhum upload/publicação automático foi adicionado.
 - Limitações registradas: execução real das etapas depende dos runners do plano
   principal; integração FilmCraft depende de configuração local; a suíte completa

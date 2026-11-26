@@ -597,7 +597,7 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 - [x] Testar player com vídeo longo, seek/Range e arquivo ausente; nenhuma leitura integral em memória no serviço.
 - [x] Verificar acessibilidade automática e manual: teclado, foco, contraste, anúncios de estado sem excesso e movimento reduzido.
 - [x] Revisar screenshots a 1440px, 1024px, 768px e 390px; corrigir hierarquia, overflow e estados vazios/erros.
-- [ ] Executar builds/testes do escopo e uma jornada com produção real configurada; registrar falhas e limitações observadas.
+- [x] Executar builds/testes do escopo e uma jornada com produção real configurada; registrar falhas e limitações observadas.
 - [x] Commit `test: verify dashboard recovery accessibility and real production flow`.
 
 **Entrega:** interface utilizável no ambiente real, com evidência de recuperação e consistência.
