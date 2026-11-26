@@ -8,27 +8,41 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .subtitle {
   color: var(--text-secondary);
   font-size: var(--font-support);
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
 }
 
 .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--button-height);
+  min-width: 160px;
+  padding: 0 var(--space-5);
   background: var(--accent);
-  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-solid);
+  color: var(--bg);
+  font-size: var(--font-body);
   text-decoration: none;
-  padding: var(--space-2) var(--space-4);
-  border-radius: 4px;
+  transition: background-color var(--motion), border-color var(--motion);
+}
+
+.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-5);
   margin: var(--space-5) 0;
 }
 
@@ -41,41 +55,55 @@
 }
 
 .filters input {
-  padding: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: var(--font-body);
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
+  border-radius: var(--radius);
+  color: var(--text);
   font-size: var(--font-body);
 }
 
 .table th,
 .table td {
-  text-align: left;
-  padding: var(--space-2);
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
 .table th {
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: var(--weight-regular);
   font-size: var(--font-support);
 }
 
+.table td {
+  font-size: var(--font-body);
+}
+
 .empty {
-  padding: var(--space-6);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.empty button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {
   .page {
-    padding: var(--space-3);
+    padding: var(--space-4) var(--space-3);
     overflow-x: hidden;
+  }
+
+  .header {
+    flex-direction: column;
   }
 }

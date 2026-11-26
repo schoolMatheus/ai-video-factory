@@ -80,7 +80,7 @@ def test_range_returns_partial_content(layout) -> None:
         UiSettings(project_root=root, data_root=root / "data"), bootstrap=bootstrap
     )
     token = bootstrap.issue()
-    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+    with TestClient(app, base_url="http://127.0.0.1:8787") as client:
         assert client.post("/api/v1/session/bootstrap", json={"token": token}).status_code == 204
         response = client.get(
             f"/api/v1/artifacts/{artifact_id}/content",

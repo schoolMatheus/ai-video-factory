@@ -13,7 +13,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def build_ui_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Abre o painel local do AI Video Factory.")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--no-browser", action="store_true")
     return parser

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>AI Video Factory — Espaço</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Space+Grotesk:wght@500&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0A0B; --plane:#161618; --plane2:#1F1F22;
+  --text:#F5F5F2; --muted:#A2A29E; --accent:#8E6BE8; --hair:#2A2A2D;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#060607;color:var(--text)}
+body{font:400 15px/1.55 'DM Sans',system-ui,sans-serif}
+.app{position:relative;width:1440px;height:900px;margin:0 auto;background:var(--bg);overflow:hidden}
+.mono{font:400 13px/1.45 'Space Mono',ui-monospace,Consolas,monospace}
+.small{font-size:13px;line-height:1.45;color:var(--muted)}
+h1{font:500 48px/1.05 'Space Grotesk','Segoe UI',sans-serif;letter-spacing:-.04em;margin:0}
+
+header{position:absolute;left:0;top:0;width:1440px;height:64px;border-bottom:1px solid var(--hair)}
+.brand{position:absolute;left:32px;top:22px;font-weight:500}
+header .topic{position:absolute;left:200px;top:23px;color:var(--muted)}
+.plane{position:absolute;left:56px;width:320px;height:72px;background:var(--plane);border:1px solid var(--hair);
+  transform:perspective(900px) rotateY(10deg) translateZ(-40px);display:flex;align-items:center;padding:0 16px;gap:12px}
+.plane .n{font-size:15px}
+.plane .st{font-size:13px;color:var(--muted);margin-left:auto}
+.plane.now{background:var(--plane2);border:2px solid var(--accent);transform:perspective(900px) rotateY(10deg) translateZ(0);
+  box-shadow:4px 4px 0 #000;padding:0 15px}
+.plane.now .st{color:var(--accent)}
+.plane.f1{transform:perspective(900px) rotateY(10deg) translateZ(-80px);opacity:.55}
+.plane.f2{transform:perspective(900px) rotateY(10deg) translateZ(-140px);opacity:.35}
+.plane.f3{transform:perspective(900px) rotateY(10deg) translateZ(-200px);opacity:.22}
+.plane.f4{transform:perspective(900px) rotateY(10deg) translateZ(-260px);opacity:.16}
+.plane .mark{width:8px;height:8px;border:1px solid var(--muted);flex:none}
+.plane.now .mark{background:var(--accent);border-color:var(--accent)}
+
+h1{position:absolute;left:440px;top:120px;width:640px}
+.sub{position:absolute;left:440px;top:180px}
+.col{position:absolute;top:232px;width:312px}
+.col h2{font-size:13px;line-height:1.45;color:var(--muted);font-weight:400;margin:0 0 16px}
+.col p{margin:0 0 24px}
+.rule{position:absolute;left:1120px;top:120px;width:288px}
+.rule .hd{font-size:13px;line-height:1.45;color:var(--muted)}
+.art{position:absolute;left:1120px;width:288px;height:64px;border-bottom:1px solid var(--hair);display:flex;align-items:center;justify-content:space-between}
+
+.btn{position:absolute;top:8px;height:48px;border-radius:0;box-shadow:4px 4px 0 #000;
+  font:400 15px/1 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{left:1256px;width:160px;background:var(--accent);color:var(--bg);border:1px solid var(--accent)}
+.primary:hover{background:#A98AF0;border-color:#A98AF0}
+.primary:active{background:#8769D9;border-color:#8769D9;transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+.secondary{left:1124px;width:120px;background:transparent;color:var(--text);border:1px solid #3A3A3D}
+.secondary:hover{background:var(--plane)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="brand">AI Video Factory</span>
+    <span class="topic">Europa's Hidden Ocean · prd_04f2</span>
+    <button class="btn secondary">Parar</button>
+    <button class="btn primary">Continuar</button>
+  </header>
+
+  <div class="plane" style="top:120px"><span class="mark"></span><span class="n">Pesquisa</span><span class="st mono">concluída</span></div>
+  <div class="plane now" style="top:216px"><span class="mark"></span><span class="n">Roteiro</span><span class="st mono">ativo</span></div>
+  <div class="plane f1" style="top:312px"><span class="mark"></span><span class="n">Narração</span><span class="st mono">não iniciada</span></div>
+  <div class="plane f2" style="top:408px"><span class="mark"></span><span class="n">Mídia</span><span class="st mono">não iniciada</span></div>
+  <div class="plane f3" style="top:504px"><span class="mark"></span><span class="n">Edição</span><span class="st mono">não iniciada</span></div>
+  <div class="plane f4" style="top:600px"><span class="mark"></span><span class="n">Revisão</span><span class="st mono">não iniciada</span></div>
+
+  <h1>Roteiro em curso</h1>
+  <div class="sub"><span class="small">Etapa 2 de 6 · </span><span class="mono">prd_04f2</span></div>
+
+  <div class="col" style="left:440px">
+    <h2>Fala</h2>
+    <p>Sob a crosta de Europa existe um oceano que nunca viu a luz do Sol. Não é uma hipótese bonita: é uma inferência construída sobre marés, gelo e um campo magnético que não deveria existir.</p>
+    <p>A sonda Europa Clipper foi enviada para responder à pergunta mais simples e mais difícil: há água suficiente, e há energia suficiente, para que algo ali viva?</p>
+  </div>
+  <div class="col" style="left:776px">
+    <h2>Direção</h2>
+    <p>Abrir em superfície rachada, sem voz, com o som de gelo. Manter o plano por quatro segundos antes da primeira frase.</p>
+    <p>Na transição para o interior, trocar o tom: menos mistério, mais medição. O espectador precisa sentir que está sendo mostrada uma evidência.</p>
+  </div>
+
+  <div class="rule"><span class="hd">Artefatos do estágio</span></div>
+  <div class="art" style="top:184px"><span class="small">Roteiro · versão 03</span><span class="mono">pronto</span></div>
+  <div class="art" style="top:248px"><span class="small">Evidências de pesquisa</span><span class="mono">18</span></div>
+  <div class="art" style="top:312px"><span class="small">Duração alvo</span><span class="mono">25 min</span></div>
+  <div class="art" style="top:376px"><span class="small">Beat 04 · fonte</span><span class="mono">pendente</span></div>
+</div>
+</body>
+</html>

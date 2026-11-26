@@ -1,31 +1,142 @@
+.list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 .list ol {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.list button {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-left: 3px solid transparent;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  font-size: var(--font-body);
+.list li + li {
+  margin-top: var(--space-4);
 }
 
-.list button:hover,
-.list button:focus-visible {
+.list button {
+  display: flex;
+  width: var(--plane-width);
+  height: var(--plane-height);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
   background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transform: perspective(900px) rotateY(10deg) translateZ(-40px);
+  transform-origin: left center;
+  transition:
+    transform var(--motion),
+    opacity var(--motion),
+    background-color var(--motion),
+    border-color var(--motion),
+    box-shadow var(--motion);
+}
+
+.list button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+.mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--text-secondary);
+}
+
+.label {
+  font-size: var(--font-body);
+  line-height: 1;
+}
+
+.state {
+  margin-left: auto;
+  font-family: var(--font-data);
+  font-size: var(--font-support);
+  color: var(--text-secondary);
 }
 
 .selected {
-  border-left-color: var(--accent) !important;
-  background: var(--surface) !important;
+  background: var(--plane-2);
+  border: 2px solid var(--accent);
+  padding: 0 15px;
+  box-shadow: var(--shadow-solid);
+  transform: perspective(900px) rotateY(10deg) translateZ(0);
 }
 
+.selected .mark {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.selected .state {
+  color: var(--accent);
+}
+
+.done {
+  transform: perspective(900px) rotateY(10deg) translateZ(-40px);
+}
+
+.depth1 {
+  transform: perspective(900px) rotateY(10deg) translateZ(-80px);
+  opacity: 0.55;
+}
+
+.depth2 {
+  transform: perspective(900px) rotateY(10deg) translateZ(-140px);
+  opacity: 0.35;
+}
+
+.depth3 {
+  transform: perspective(900px) rotateY(10deg) translateZ(-200px);
+  opacity: 0.22;
+}
+
+.depth4 {
+  transform: perspective(900px) rotateY(10deg) translateZ(-260px);
+  opacity: 0.16;
+}
+
+/* O plano em foco volta à frente; nenhuma etapa fica ilegível ao teclado. */
+.list button:hover,
+.list button:focus-visible {
+  opacity: 1;
+  transform: perspective(900px) rotateY(10deg) translateZ(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list button,
+  .list button:hover,
+  .list button:focus-visible {
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .list {
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .list ol {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .list li + li {
+    margin-top: 0;
+  }
+
+  .list button,
+  .list button:hover,
+  .list button:focus-visible {
+    flex: none;
+    width: 260px;
+    transform: none;
+    opacity: 1;
+  }
+}

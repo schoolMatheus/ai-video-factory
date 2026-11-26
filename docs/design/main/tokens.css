@@ -1,0 +1,86 @@
+/*
+ * Design principal — Espaço (roxo midnight)
+ * Contrato de tokens. Ao implementar, copie estes valores para
+ * web/src/styles/tokens.css ajustando os nomes conforme o mapa no fim deste arquivo.
+ */
+
+:root {
+  /* Cor */
+  --bg: #0A0A0B;              /* 0°, 4%, 4%   */
+  --plane: #161618;           /* 0°, 4%, 9%   */
+  --plane-2: #1F1F22;         /* 240°, 4%, 13% */
+  --text: #F5F5F2;            /* 60°, 12%, 95% */
+  --muted: #A2A29E;           /* 60°, 2%, 63%  */
+  --hair: #2A2A2D;            /* 240°, 4%, 17% */
+  --accent: #8E6BE8;          /* 257°, 73%, 66% — roxo midnight */
+  --accent-hover: #A98AF0;
+  --accent-pressed: #8769D9;
+  --disabled-bg: #2C243A;
+  --disabled-text: #A295B8;
+  --secondary-border: #3A3A3D;
+
+  /* Tipografia */
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-data: 'Space Mono', ui-monospace, Consolas, monospace;
+
+  --text-display: 48px;
+  --text-body: 15px;
+  --text-small: 13px;
+
+  --leading-display: 1.05;
+  --leading-body: 1.55;
+  --leading-small: 1.45;
+  --tracking-display: -0.04em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --measure: 66ch;
+
+  /* Espaço */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Superfície e profundidade */
+  --radius: 0px;
+  --shadow-solid: 4px 4px 0 #000;
+  --shadow-solid-pressed: 2px 2px 0 #000;
+  --hairline: 1px solid var(--hair);
+
+  /* Movimento */
+  --motion: 150ms ease-out;
+  --focus-outline: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  /* Tamanhos */
+  --button-height: 48px;
+  --button-primary-width: 160px;
+  --button-secondary-width: 120px;
+  --plane-height: 72px;
+  --plane-width: 320px;
+}
+
+/*
+ * Mapa para web/src/styles/tokens.css (nomes atuais da aplicação):
+ *   --bg        -> --bg
+ *   --plane     -> --surface
+ *   --text      -> --text
+ *   --muted     -> --text-secondary
+ *   --hair      -> --border
+ *   --accent    -> --accent
+ *   --text-display -> --font-title
+ *   --text-body    -> --font-body
+ *   --text-small   -> --font-support
+ *   --space-1..7   -> --space-1..7 (a escala atual já existe)
+ *   --font-display (família) -> --font-display
+ *   --font-body (família)    -> --font-ui (o app usa --font-body como tamanho)
+ *   --font-data (família)    -> --font-data
+ *
+ * Novos tokens que a aplicação ainda não tem: --plane-2, --accent-hover,
+ * --accent-pressed, --font-data, --shadow-solid, --motion.
+ */

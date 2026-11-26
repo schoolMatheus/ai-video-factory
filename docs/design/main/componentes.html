@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1200">
+<title>AI Video Factory — componentes do design principal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Space+Grotesk:wght@500&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0A0B; --plane:#161618; --plane2:#1F1F22;
+  --text:#F5F5F2; --muted:#A2A29E; --hair:#2A2A2D;
+  --accent:#8E6BE8; --hover:#A98AF0; --pressed:#8769D9;
+  --disabled-bg:#2C243A; --disabled-text:#A295B8; --secondary-border:#3A3A3D;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#060607;color:var(--text)}
+body{font:400 15px/1.55 'DM Sans',system-ui,sans-serif}
+.wrap{width:1100px;margin:0 auto;padding:48px 0 96px}
+h1{font:500 48px/1.05 'Space Grotesk',sans-serif;letter-spacing:-.04em;margin:0}
+h2{font-size:13px;line-height:1.45;color:var(--muted);font-weight:400;margin:0 0 24px}
+.mono{font:400 13px/1.45 'Space Mono',ui-monospace,Consolas,monospace}
+section{margin-top:64px;padding-top:24px;border-top:1px solid var(--hair)}
+.row{display:flex;align-items:center;gap:12px;min-height:88px;border-bottom:1px solid var(--hair)}
+.row:last-child{border-bottom:0}
+.cap{width:180px;flex:none;color:var(--muted);font-size:13px;line-height:1.45}
+
+.btn{height:48px;border-radius:0;box-shadow:4px 4px 0 #000;
+  font:400 15px/1 'DM Sans',sans-serif;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--accent);background:var(--accent);color:var(--bg);padding:0 24px;min-width:160px}
+.sec{background:transparent;color:var(--text);border-color:var(--secondary-border);min-width:120px}
+.is-hover{background:var(--hover);border-color:var(--hover)}
+.is-focus{outline:2px solid var(--accent);outline-offset:2px}
+.is-pressed{background:var(--pressed);border-color:var(--pressed);transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+.is-disabled{background:var(--disabled-bg);border-color:var(--disabled-bg);color:var(--disabled-text);box-shadow:none}
+.is-loading{gap:10px;width:190px}
+.spinner{width:14px;height:14px;border:2px solid rgba(10,10,11,.35);border-top-color:var(--bg);border-radius:50%}
+.btn.sec.is-hover{background:var(--plane)}
+
+.plane{width:320px;height:72px;background:var(--plane);border:1px solid var(--hair);
+  transform:perspective(900px) rotateY(10deg) translateZ(-80px);
+  display:flex;align-items:center;padding:0 16px;gap:12px}
+.plane .mark{width:8px;height:8px;border:1px solid var(--muted);flex:none}
+.plane .n{font-size:15px}
+.plane .st{font-size:13px;color:var(--muted);margin-left:auto}
+.plane.done{background:var(--plane);opacity:.7}
+.plane.now{background:var(--plane2);border:2px solid var(--accent);transform:perspective(900px) rotateY(10deg) translateZ(0);
+  box-shadow:4px 4px 0 #000;padding:0 15px}
+.plane.now .mark{background:var(--accent);border-color:var(--accent)}
+.plane.now .st{color:var(--accent)}
+.plane.future{opacity:.35;transform:perspective(900px) rotateY(10deg) translateZ(-140px)}
+
+.art{height:64px;border-bottom:1px solid var(--hair);display:flex;align-items:center;justify-content:space-between;max-width:620px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Espaço · componentes</h1>
+  <div class="mono" style="color:var(--muted);margin-top:8px">Design principal · roxo midnight #8E6BE8</div>
+
+  <section>
+    <h2>Botão primário</h2>
+    <div class="row"><span class="cap">Padrão</span><button class="btn">Continuar</button></div>
+    <div class="row"><span class="cap">Hover</span><button class="btn is-hover">Continuar</button></div>
+    <div class="row"><span class="cap">Foco</span><button class="btn is-focus">Continuar</button></div>
+    <div class="row"><span class="cap">Pressionado</span><button class="btn is-pressed">Continuar</button></div>
+    <div class="row"><span class="cap">Desabilitado</span><button class="btn is-disabled" disabled>Continuar</button><span class="mono" style="color:var(--muted)">Serviço não configurado</span></div>
+    <div class="row"><span class="cap">Carregando</span><button class="btn is-loading"><span class="spinner"></span>Continuar</button></div>
+  </section>
+
+  <section>
+    <h2>Botão secundário</h2>
+    <div class="row"><span class="cap">Padrão</span><button class="btn sec">Parar</button></div>
+    <div class="row"><span class="cap">Hover</span><button class="btn sec is-hover">Parar</button></div>
+    <div class="row"><span class="cap">Foco</span><button class="btn sec is-focus">Parar</button></div>
+  </section>
+
+  <section>
+    <h2>Plano de estágio</h2>
+    <div class="row"><span class="cap">Concluído</span><div class="plane done"><span class="mark"></span><span class="n">Pesquisa</span><span class="st mono">concluída</span></div></div>
+    <div class="row"><span class="cap">Atual</span><div class="plane now"><span class="mark"></span><span class="n">Roteiro</span><span class="st mono">ativo</span></div></div>
+    <div class="row"><span class="cap">Futuro</span><div class="plane future"><span class="mark"></span><span class="n">Narração</span><span class="st mono">não iniciada</span></div></div>
+  </section>
+
+  <section>
+    <h2>Lista de artefatos</h2>
+    <div class="art"><span>Roteiro · versão 03</span><span class="mono" style="color:var(--text)">pronto</span></div>
+    <div class="art"><span>Evidências de pesquisa</span><span class="mono" style="color:var(--text)">18</span></div>
+    <div class="art"><span>Beat 04 · fonte</span><span class="mono" style="color:var(--accent)">pendente</span></div>
+  </section>
+</div>
+</body>
+</html>

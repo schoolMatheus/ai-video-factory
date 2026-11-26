@@ -1,86 +1,184 @@
 .workspace {
-  padding: var(--space-6);
-  max-width: 1280px;
+  max-width: 1600px;
   margin: 0 auto;
+  padding: var(--space-5) var(--space-6) var(--space-8);
 }
 
 .disconnected {
-  padding: var(--space-2) var(--space-3);
-  background: #fffaeb;
-  border: 1px solid #fedf89;
-  color: #93370d;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--accent);
+  color: var(--text-secondary);
   font-size: var(--font-support);
 }
 
 .header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: var(--space-4);
+  justify-content: space-between;
+  gap: var(--space-5);
   margin-bottom: var(--space-5);
+}
+
+.header h1 {
+  max-width: 24ch;
+}
+
+.support {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-support);
 }
 
 .headerActions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-}
-
-.headerActions button {
-  padding: var(--space-2) var(--space-3);
-  background: var(--accent);
-  color: #fff;
-  border: 0;
-  border-radius: 4px;
-}
-
-.headerActions button:disabled {
-  opacity: 0.5;
-}
-
-.support {
-  color: var(--text-secondary);
-  font-size: var(--font-support);
+  gap: var(--space-4);
 }
 
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-5);
   border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .tabs button {
+  min-height: 44px;
+  padding: 0 var(--space-1);
   border: 0;
+  border-bottom: 2px solid transparent;
   background: transparent;
-  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-support);
   cursor: pointer;
+  transition: color var(--motion), border-color var(--motion);
+}
+
+.tabs button:hover {
+  color: var(--text);
 }
 
 .tabs button[aria-selected="true"] {
   color: var(--accent);
-  border-bottom: 2px solid var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .columns {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 2fr;
-  gap: var(--space-5);
+  grid-template-columns: var(--plane-width) minmax(0, 1fr) 288px;
+  column-gap: var(--space-6);
+  align-items: start;
 }
 
-.count {
+.stageColumn {
+  padding-right: var(--space-6);
+}
+
+.count,
+.stageMeta,
+.artifactHeading {
+  margin: 0 0 var(--space-2);
   color: var(--text-secondary);
   font-size: var(--font-support);
+  font-weight: var(--weight-regular);
+}
+
+.stageMeta {
+  margin-bottom: var(--space-4);
+}
+
+.data {
+  font-family: var(--font-data);
+}
+
+.inspector h2 {
   margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-support);
+  font-weight: var(--weight-regular);
+}
+
+.inspector table {
+  max-width: 720px;
+}
+
+.artifactList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.artifactRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 64px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-support);
+}
+
+.artifactEmpty {
+  display: grid;
+  align-content: center;
+  gap: var(--space-1);
+  min-height: 64px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--font-support);
+}
+
+.artifactEmpty .textAction {
+  justify-self: start;
+}
+
+.artifactState {
+  flex: none;
+  font-family: var(--font-data);
+  font-size: var(--font-support);
+  color: var(--text-secondary);
+}
+
+.textAction {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fileRow {
+  display: block;
+  min-height: 0;
+  padding: var(--space-4) 0;
+}
+
+@media (max-width: 1100px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-6);
+  }
+
+  .stageColumn {
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 768px) {
   .workspace {
-    padding: var(--space-3);
+    padding: var(--space-4) var(--space-3) var(--space-7);
   }
 
-  .columns {
-    grid-template-columns: 1fr;
+  .header {
+    flex-direction: column;
   }
 }

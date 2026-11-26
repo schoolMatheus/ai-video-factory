@@ -38,9 +38,9 @@ def test_port_in_use_does_not_kill_another_process(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: BusySocket())
 
     with pytest.raises(SystemExit) as error:
-        prepare_launch(Path.cwd(), port=8765)
+        prepare_launch(Path.cwd(), port=8787)
 
-    assert "8765" in str(error.value)
+    assert "8787" in str(error.value)
 
 
 def test_parser_supports_no_browser_and_port() -> None:
@@ -74,7 +74,7 @@ def test_tools_do_not_run_checks_on_read(tmp_path: Path, monkeypatch: pytest.Mon
     bootstrap = BootstrapService(tmp_path / "bootstrap.token")
     token = bootstrap.issue()
     app = create_app(UiSettings(project_root=tmp_path), bootstrap=bootstrap)
-    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+    with TestClient(app, base_url="http://127.0.0.1:8787") as client:
         assert client.post("/api/v1/session/bootstrap", json={"token": token}).status_code == 204
         response = client.get("/api/v1/tools")
 
@@ -98,7 +98,7 @@ def test_tool_check_is_explicit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     bootstrap = BootstrapService(tmp_path / "bootstrap.token")
     token = bootstrap.issue()
     app = create_app(UiSettings(project_root=tmp_path), bootstrap=bootstrap)
-    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+    with TestClient(app, base_url="http://127.0.0.1:8787") as client:
         assert client.post("/api/v1/session/bootstrap", json={"token": token}).status_code == 204
         csrf = client.cookies.get("avf_session_csrf")
         response = client.post(

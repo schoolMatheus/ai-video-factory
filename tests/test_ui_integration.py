@@ -13,7 +13,7 @@ from ai_video_factory.ui_backend.session import BootstrapService
 def _client(root: Path) -> TestClient:
     bootstrap = BootstrapService(root / "data" / "ui" / "bootstrap.token")
     app = create_app(UiSettings(project_root=root), bootstrap=bootstrap)
-    client = TestClient(app, base_url="http://127.0.0.1:8765")
+    client = TestClient(app, base_url="http://127.0.0.1:8787")
     token = bootstrap.issue()
     assert client.post("/api/v1/session/bootstrap", json={"token": token}).status_code == 204
     return client

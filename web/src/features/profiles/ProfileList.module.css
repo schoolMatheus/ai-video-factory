@@ -1,6 +1,7 @@
 .page {
   padding: var(--space-6);
   max-width: 1000px;
+  margin: 0 auto;
 }
 
 .page table {
@@ -12,6 +13,19 @@
 .page th,
 .page td {
   text-align: left;
-  padding: var(--space-2);
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--border);
+  font-size: var(--font-body);
+}
+
+.page th {
+  color: var(--text-secondary);
+  font-size: var(--font-support);
+  font-weight: var(--weight-regular);
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-4) var(--space-3);
+  }
 }

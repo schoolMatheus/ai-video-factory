@@ -1,15 +1,49 @@
+/*
+ * Design principal — Espaço (roxo midnight)
+ * Contrato canônico: docs/design/main/tokens.css.
+ * Os nomes já usados pela aplicação (--surface, --text-secondary, --border,
+ * --font-title/body/support) são preservados; os aliases do contrato convivem
+ * com eles para que CSS Modules e componentes possam usar a mesma escala.
+ */
+
 :root {
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --text: #182230;
-  --text-secondary: #475467;
-  --accent: #175cd3;
-  --border: #e4e7ec;
+  /* Cor */
+  --bg: #0a0a0b;
+  --surface: #161618;          /* plano dos estágios */
+  --plane-2: #1f1f22;          /* plano atual */
+  --text: #f5f5f2;
+  --text-secondary: #a2a29e;   /* texto de apoio */
+  --border: #2a2a2d;           /* hairlines */
+  --accent: #8e6be8;           /* roxo midnight */
+  --accent-hover: #a98af0;
+  --accent-pressed: #8769d9;
+  --disabled-bg: #2c243a;
+  --disabled-text: #a295b8;
+  --secondary-border: #3a3a3d;
 
-  --font-title: 24px;
-  --font-body: 16px;
-  --font-support: 14px;
+  /* Famílias tipográficas */
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --font-data: 'Space Mono', ui-monospace, Consolas, monospace;
 
+  /* Tamanhos — nomes existentes na aplicação */
+  --font-title: 48px;
+  --font-body: 15px;
+  --font-support: 13px;
+
+  /* Aliases do contrato de design */
+  --text-display: var(--font-title);
+  --text-body: var(--font-body);
+  --text-small: var(--font-support);
+  --leading-display: 1.05;
+  --leading-body: 1.55;
+  --leading-small: 1.45;
+  --tracking-display: -0.04em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --measure: 66ch;
+
+  /* Espaço */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -17,4 +51,19 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
+  --space-8: 64px;
+
+  /* Superfície e profundidade */
+  --radius: 0;
+  --shadow-solid: 4px 4px 0 #000;
+  --shadow-solid-pressed: 2px 2px 0 #000;
+  --focus-outline: 2px solid var(--accent);
+  --focus-offset: 2px;
+  --motion: 150ms ease-out;
+
+  /* Tamanhos de componente */
+  --header-height: 64px;
+  --button-height: 48px;
+  --plane-height: 72px;
+  --plane-width: 320px;
 }

@@ -15,14 +15,14 @@ ai-video-factory ui --no-browser
 ```
 
 O comando `ui` valida a porta local, imprime uma URL
-`http://127.0.0.1:8765/#token=<segredo>` e troca esse segredo por uma sessão
+`http://127.0.0.1:8787/#token=<segredo>` e troca esse segredo por uma sessão
 HttpOnly/SameSite estrita. O token aparece uma única vez e não é gravado em
 logs. Se a porta estiver ocupada, escolha outra com `--port`; nenhum processo
 alheio é encerrado.
 
 Se os assets compilados não existirem, a API responde com uma página explicando
 como gerá-los. Em desenvolvimento, `npm run dev` usa o proxy de `/api` para a
-porta 8765.
+porta 8787.
 
 ## O que a interface mostra
 

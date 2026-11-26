@@ -50,7 +50,7 @@ app.add_typer(workflow_app, name="workflow")
 
 @app.command("ui")
 def ui_command(
-    port: int = typer.Option(8765, "--port", help="Porta local do painel."),
+    port: int = typer.Option(8787, "--port", help="Porta local do painel."),
     no_browser: bool = typer.Option(False, "--no-browser", help="Não abrir o navegador."),
 ) -> None:
     """Abre o painel local servido pelo próprio Python."""

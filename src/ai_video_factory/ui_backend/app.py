@@ -41,7 +41,7 @@ class UiSettings:
     profiles_db: Path | None = None
     static_dir: Path | None = None
     bind_host: str = "127.0.0.1"
-    port: int = 8765
+    port: int = 8787
     sse_poll_interval: float = 1.0
     sse_max_polls: int = 3600
     sse_heartbeat_after: int = 4

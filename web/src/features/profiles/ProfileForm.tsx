@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ApiError, createProfile, reviseProfile } from "../../api/client";
 import type { ProfileView } from "../../api/types";
+import { Button } from "../../components/Button";
 import { InlineError } from "../../components/InlineError";
 import styles from "./ProfileForm.module.css";
 
@@ -85,7 +86,7 @@ export function ProfileForm({ profile }: { profile?: ProfileView }) {
         Produções em andamento mantêm o snapshot usado no início; a nova revisão vale
         para as próximas.
       </p>
-      <button type="submit">Salvar perfil</button>
+      <Button type="submit">Salvar perfil</Button>
       {error && <InlineError message={error} />}
       {saved && (
         <p role="status">

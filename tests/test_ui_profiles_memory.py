@@ -124,7 +124,7 @@ def harness(tmp_path: Path) -> Harness:
         profiles=adapter,
     )
     app = create_app(UiSettings(project_root=tmp_path), services)
-    http = TestClient(app, base_url="http://127.0.0.1:8765")
+    http = TestClient(app, base_url="http://127.0.0.1:8787")
     response = http.post(
         "/api/v1/session/bootstrap",
         json={"token": (tmp_path / "bootstrap.token").read_text(encoding="ascii")},

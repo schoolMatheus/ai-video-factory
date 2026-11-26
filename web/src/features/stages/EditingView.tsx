@@ -1,4 +1,5 @@
 import type { ActionAvailability } from "../../api/types";
+import { Button } from "../../components/Button";
 
 export function EditingView({
   actions = [],
@@ -12,12 +13,12 @@ export function EditingView({
     <section aria-label="Edição">
       <h3>FilmCraft</h3>
       <p>Projeto e prévia ainda não disponíveis para esta produção.</p>
-      <button type="button" disabled={!open?.enabled} title={open?.reason ?? undefined}>
+      <Button variant="secondary" disabled={!open?.enabled} title={open?.reason ?? undefined}>
         Abrir projeto
-      </button>
-      <button type="button" disabled={!reconcile?.enabled} title={reconcile?.reason ?? undefined}>
+      </Button>
+      <Button variant="secondary" disabled={!reconcile?.enabled} title={reconcile?.reason ?? undefined}>
         Reconciliar estado
-      </button>
+      </Button>
       <p>A exportação bem-sucedida não comprova ausência de mídia offline.</p>
     </section>
   );

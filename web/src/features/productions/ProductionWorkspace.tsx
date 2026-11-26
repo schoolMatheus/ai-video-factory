@@ -4,8 +4,10 @@ import { useParams } from "react-router-dom";
 import { getProduction, listEvents } from "../../api/client";
 import { ProductionEventStream, type StreamStatus } from "../../api/events";
 import { queryKeys } from "../../api/queryKeys";
+import { API_PREFIX } from "../../api/types";
 import type {
   ActionAvailability,
+  ArtifactView,
   EventView,
   Progress,
   StageName,
@@ -13,6 +15,7 @@ import type {
 } from "../../api/types";
 import { ActivityFeed } from "../../components/ActivityFeed";
 import { ArtifactViewer } from "../../components/ArtifactViewer";
+import { Button } from "../../components/Button";
 import { InlineError } from "../../components/InlineError";
 import { StageList } from "../../components/StageList";
 import { StatusText } from "../../components/StatusText";
@@ -52,11 +55,11 @@ function StageInspector({
   if (!stage) return <p>Selecione uma etapa.</p>;
   const progress = formatProgress(stage.progress);
   return (
-    <section aria-label={`Detalhes da etapa ${STAGE_LABELS[stage.name]}`}>
+    <section className={styles.inspector} aria-label={`Detalhes da etapa ${STAGE_LABELS[stage.name]}`}>
       <h2>{STAGE_LABELS[stage.name]}</h2>
       <StatusText status={stage.status} />
       {stage.activity && <p>{stage.activity}</p>}
-      {progress && <p>{progress}</p>}
+      {progress && <p className={styles.data}>{progress}</p>}
       {stage.last_activity_at && (
         <p className={styles.support}>Última atividade: {stage.last_activity_at}</p>
       )}
@@ -74,10 +77,44 @@ function StageInspector({
         <EditingView actions={actions} />
       )}
       {stage.name === "review" && <ReviewView />}
-      {(stage.artifacts ?? []).map((artifact) => (
-        <ArtifactViewer key={artifact.id} artifact={artifact} />
-      ))}
     </section>
+  );
+}
+
+function StageArtifacts({
+  artifacts,
+  onShowFiles,
+}: {
+  artifacts: ArtifactView[];
+  onShowFiles: () => void;
+}) {
+  if (artifacts.length === 0) {
+    return (
+      <p className={styles.artifactEmpty}>
+        Nenhum artefato neste estágio.
+        <button type="button" className={styles.textAction} onClick={onShowFiles}>
+          Ver todos os arquivos
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <ul className={styles.artifactList}>
+      {artifacts.map((artifact) => (
+        <li key={artifact.id} className={styles.artifactRow}>
+          <a
+            href={`${API_PREFIX}/artifacts/${encodeURIComponent(artifact.id)}/content`}
+            download={artifact.name}
+          >
+            {artifact.name}
+          </a>
+          <span className={styles.artifactState}>
+            {artifact.integrity === "verified" ? "verificado" : "sem registro"}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -151,6 +188,7 @@ export function ProductionWorkspace() {
     [stages, selected],
   );
   const completed = stages.filter((item) => item.status === "completed").length;
+  const stageNumber = stages.findIndex((item) => item.name === selected) + 1;
   const resume = (snapshot.data?.capabilities ?? []).find(
     (item) => item.action === "resume",
   );
@@ -181,9 +219,13 @@ export function ProductionWorkspace() {
         </div>
         <div className={styles.headerActions}>
           <StatusText status={snapshot.data.state} />
-          <button type="button" disabled={!resume?.enabled} title={resume?.reason ?? undefined}>
+          <Button
+            variant="primary"
+            disabled={!resume?.enabled}
+            title={resume?.reason ?? undefined}
+          >
             Retomar
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -210,21 +252,35 @@ export function ProductionWorkspace() {
 
       {tab === "stages" && (
         <div className={styles.columns}>
-          <div>
+          <div className={styles.stageColumn}>
             <p className={styles.count}>{completed} de 6 etapas concluídas</p>
             <StageList stages={stages} selected={selected} onSelect={setSelected} />
           </div>
-          <StageInspector stage={stage} actions={snapshot.data.capabilities ?? []} />
+          <div className={styles.contentColumn}>
+            <p className={styles.stageMeta}>
+              Etapa {stageNumber} de 6 · <span className={styles.data}>{productionId}</span>
+            </p>
+            <StageInspector stage={stage} actions={snapshot.data.capabilities ?? []} />
+          </div>
+          <aside className={styles.artifactColumn} aria-label="Artefatos do estágio">
+            <h2 className={styles.artifactHeading}>Artefatos do estágio</h2>
+            <StageArtifacts
+              artifacts={stage?.artifacts ?? []}
+              onShowFiles={() => setTab("files")}
+            />
+          </aside>
         </div>
       )}
       {tab === "files" && (
-        <ul>
+        <ul className={styles.artifactList}>
           {(snapshot.data.artifacts ?? []).map((artifact) => (
-            <li key={artifact.id}>
+            <li key={artifact.id} className={styles.fileRow}>
               <ArtifactViewer artifact={artifact} />
             </li>
           ))}
-          {!snapshot.data.artifacts?.length && <li>Nenhum arquivo confirmado ainda.</li>}
+          {!snapshot.data.artifacts?.length && (
+            <li className={styles.fileRow}>Nenhum arquivo confirmado ainda.</li>
+          )}
         </ul>
       )}
       {tab === "history" && <ActivityFeed events={events} />}

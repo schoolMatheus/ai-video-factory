@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createProduction, preflightProduction } from "../../api/client";
+import { Button } from "../../components/Button";
 import { InlineError } from "../../components/InlineError";
 import styles from "./ProductionCreate.module.css";
 
@@ -166,12 +167,16 @@ export function ProductionCreate() {
           />
         )}
         <div className={styles.actions}>
-          <button type="submit" disabled={!canStart || submit.isPending}>
-            {submit.isPending ? "Iniciando…" : "Iniciar produção"}
-          </button>
-          <button type="button" onClick={saveDraft}>
+          <Button
+            type="submit"
+            loading={submit.isPending}
+            disabled={!canStart || submit.isPending}
+          >
+            Iniciar produção
+          </Button>
+          <Button variant="secondary" onClick={saveDraft}>
             Salvar rascunho
-          </button>
+          </Button>
           {draftSaved && <span role="status">Rascunho salvo, sem execução.</span>}
         </div>
       </form>

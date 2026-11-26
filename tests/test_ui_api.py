@@ -26,7 +26,7 @@ class _ClientFactory:
             ),
             bootstrap=self.bootstrap,
         )
-        http = TestClient(app, base_url="http://127.0.0.1:8765")
+        http = TestClient(app, base_url="http://127.0.0.1:8787")
         if authenticated:
             token = self.bootstrap.issue()
             response = http.post(

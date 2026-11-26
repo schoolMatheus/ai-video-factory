@@ -1,20 +1,12 @@
+/* Estado sempre em palavra e em fonte de dados. Nunca apenas cor. */
 .status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
+  font-family: var(--font-data);
   font-size: var(--font-support);
+  line-height: var(--leading-small);
   color: var(--text-secondary);
 }
 
-.status::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
+.running,
+.failed {
+  color: var(--text);
 }
-
-.running { color: var(--accent); }
-.completed { color: #067647; }
-.failed { color: #b42318; }
-.superseded { color: var(--text-secondary); }
