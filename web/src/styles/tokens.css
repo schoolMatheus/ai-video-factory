@@ -1,0 +1,20 @@
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #182230;
+  --text-secondary: #475467;
+  --accent: #175cd3;
+  --border: #e4e7ec;
+
+  --font-title: 24px;
+  --font-body: 16px;
+  --font-support: 14px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+}

@@ -1,0 +1,20 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-support);
+  color: var(--text-secondary);
+}
+
+.status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.running { color: var(--accent); }
+.completed { color: #067647; }
+.failed { color: #b42318; }
+.superseded { color: var(--text-secondary); }
