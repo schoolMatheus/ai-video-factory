@@ -189,6 +189,37 @@ def test_missing_production_returns_not_found(factory: _ClientFactory) -> None:
     assert response.status_code == 404
 
 
+def test_create_production_is_idempotent(
+    factory: _ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ai_video_factory.ui_backend.jobs import JobService
+
+    monkeypatch.setattr(JobService, "_spawn", lambda self, job_id: None)
+    http = factory.client()
+    csrf = http.cookies.get("avf_session_csrf")
+    headers = {"Idempotency-Key": "key-1", "X-CSRF-Token": csrf}
+    payload = {"topic": "tema", "profile_id": "canal-a"}
+
+    first = http.post("/api/v1/productions", json=payload, headers=headers)
+    second = http.post("/api/v1/productions", json=payload, headers=headers)
+
+    assert first.status_code == 202, first.text
+    assert second.status_code == 202, second.text
+    assert first.json()["job_id"] == second.json()["job_id"]
+    assert http.get(f"/api/v1/jobs/{first.json()['job_id']}").status_code == 200
+
+
+def test_create_production_requires_idempotency_key(factory: _ClientFactory) -> None:
+    http = factory.client()
+    response = http.post(
+        "/api/v1/productions",
+        json={"topic": "tema"},
+        headers={"X-CSRF-Token": http.cookies.get("avf_session_csrf")},
+    )
+
+    assert response.status_code == 422
+
+
 def test_expired_cursor_requires_new_snapshot(factory: _ClientFactory, tmp_path: Path) -> None:
     run = _make_run(tmp_path)
     http = factory.client()

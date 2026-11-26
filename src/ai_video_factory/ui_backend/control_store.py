@@ -54,12 +54,154 @@ class ControlStore:
                     production_id TEXT,
                     status TEXT NOT NULL,
                     idempotency_key TEXT,
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    worker_token TEXT,
+                    pid INTEGER,
                     heartbeat_at TEXT,
                     result_reference TEXT,
-                    problem TEXT
+                    stop_requested INTEGER NOT NULL DEFAULT 0,
+                    progress TEXT,
+                    problem TEXT,
+                    created_at TEXT,
+                    updated_at TEXT
                 );
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+            }
+            for name, declaration in (
+                ("payload", "TEXT NOT NULL DEFAULT '{}'"),
+                ("worker_token", "TEXT"),
+                ("pid", "INTEGER"),
+                ("stop_requested", "INTEGER NOT NULL DEFAULT 0"),
+                ("progress", "TEXT"),
+                ("created_at", "TEXT"),
+                ("updated_at", "TEXT"),
+            ):
+                if name not in columns:
+                    connection.execute(f"ALTER TABLE jobs ADD COLUMN {name} {declaration}")
+
+    # -- jobs --------------------------------------------------------------
+
+    def insert_idempotency(self, key: str, job_id: str, created_at: str) -> bool:
+        """Return True when the key was new; False when it already existed."""
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO idempotency_keys (key, job_id, created_at) VALUES (?, ?, ?)",
+                (key, job_id, created_at),
+            )
+            return cursor.rowcount == 1
+
+    def idempotent_job_id(self, key: str) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT job_id FROM idempotency_keys WHERE key = ?", (key,)
+            ).fetchone()
+        return str(row["job_id"]) if row else None
+
+    def insert_job(self, job: dict[str, object]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO jobs (
+                    job_id, production_id, status, idempotency_key, payload,
+                    worker_token, pid, heartbeat_at, result_reference,
+                    stop_requested, progress, problem, created_at, updated_at
+                ) VALUES (
+                    :job_id, :production_id, :status, :idempotency_key, :payload,
+                    :worker_token, :pid, :heartbeat_at, :result_reference,
+                    :stop_requested, :progress, :problem, :created_at, :updated_at
+                )
+                """,
+                job,
+            )
+
+    def job(self, job_id: str) -> dict[str, object] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM jobs WHERE job_id = ?", (job_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_job(self, job_id: str, fields: dict[str, object]) -> None:
+        if not fields:
+            return
+        assignments = ", ".join(f"{name} = ?" for name in fields)
+        with self._connect() as connection:
+            connection.execute(
+                f"UPDATE jobs SET {assignments} WHERE job_id = ?",
+                (*fields.values(), job_id),
+            )
+
+    def claim_job(self, job_id: str, token: str, now: str) -> bool:
+        """Atomically claim one job; returns False when another worker won."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """
+                    SELECT status FROM jobs WHERE job_id = ?
+                    AND status IN ('queued', 'running') AND worker_token IS NULL
+                    """,
+                    (job_id,),
+                ).fetchone()
+                if row is None:
+                    connection.rollback()
+                    return False
+                connection.execute(
+                    """
+                    UPDATE jobs SET status = 'running', worker_token = ?, heartbeat_at = ?,
+                    updated_at = ? WHERE job_id = ?
+                    """,
+                    (token, now, now, job_id),
+                )
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+
+    def next_queued_job(self, now: str) -> dict[str, object] | None:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                active = connection.execute(
+                    "SELECT COUNT(*) AS total FROM jobs WHERE status IN ('running', 'stop_requested')"
+                ).fetchone()
+                if int(active["total"]) > 0:
+                    connection.rollback()
+                    return None
+                row = connection.execute(
+                    """
+                    SELECT * FROM jobs WHERE status = 'queued' AND worker_token IS NULL
+                    ORDER BY created_at, job_id LIMIT 1
+                    """
+                ).fetchone()
+                if row is None:
+                    connection.rollback()
+                    return None
+                token = secrets.token_hex(16)
+                connection.execute(
+                    """
+                    UPDATE jobs SET status = 'running', worker_token = ?, heartbeat_at = ?,
+                    updated_at = ? WHERE job_id = ?
+                    """,
+                    (token, now, now, row["job_id"]),
+                )
+                connection.commit()
+                updated = dict(row)
+                updated["worker_token"] = token
+                return updated
+            except Exception:
+                connection.rollback()
+                raise
+
+    def all_jobs(self) -> list[dict[str, object]]:
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM jobs").fetchall()
+        return [dict(row) for row in rows]
 
     def insert_events(self, events: list[EventView]) -> None:
         if not events:

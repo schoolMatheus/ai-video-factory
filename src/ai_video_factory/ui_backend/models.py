@@ -119,6 +119,16 @@ class ProductionView(BaseModel):
     cursor: str | None = None
 
 
+class ProductionCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str | None = None
+    topic: str = Field(min_length=1)
+    angle: str | None = None
+    target_minutes: int | None = Field(default=None, ge=1, le=120)
+    seed_source_urls: list[str] = Field(default_factory=list)
+
+
 class ProductionFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

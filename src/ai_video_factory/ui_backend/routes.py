@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
+import hashlib
 import json
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
 from ai_video_factory.ui_backend import domain
@@ -13,8 +13,10 @@ from ai_video_factory.ui_backend.models import (
     ActionRequest,
     CapabilitiesView,
     EventPage,
+    JobView,
     NotFoundError,
     OperationReceipt,
+    ProductionCreateRequest,
     ProductionFilters,
     ProductionPage,
     ProductionView,
@@ -94,6 +96,23 @@ def capabilities() -> CapabilitiesView:
     return domain.get_capabilities()
 
 
+@router.post("/productions", status_code=202, response_model=OperationReceipt)
+def create_production(
+    payload: ProductionCreateRequest,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> OperationReceipt:
+    from ai_video_factory.ui_backend.models import InvalidRequestError
+
+    if not idempotency_key:
+        raise InvalidRequestError("Cabeçalho Idempotency-Key é obrigatório.")
+    job_service = jobs_of(request)
+    production_id = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:32]
+    document = payload.model_dump()
+    document["production_id"] = production_id
+    return job_service.submit(document, idempotency_key=idempotency_key)
+
+
 @router.get("/productions", response_model=ProductionPage)
 def productions(
     request: Request,
@@ -119,6 +138,16 @@ def production(production_id: str, request: Request) -> ProductionView:
 def stage(production_id: str, stage: StageName, request: Request) -> StageView:
     _, _, models = services_of(request)
     return models.get_stage(production_id, stage)
+
+
+def jobs_of(request: Request):  # type: ignore[no-untyped-def]
+    from ai_video_factory.ui_backend.jobs import JobService
+    from ai_video_factory.ui_backend.models import DependencyUnavailableError
+
+    job_service = request.app.state.services.jobs
+    if job_service is None:
+        raise DependencyUnavailableError("Fila de jobs não disponível.")
+    return job_service
 
 
 def events_of(request: Request) -> EventService:
@@ -206,6 +235,6 @@ def memory(profile_id: str) -> None:
     raise NotFoundError("Memória de perfil ainda não está disponível neste ambiente.")
 
 
-@router.get("/jobs/{job_id}")
-def job(job_id: str) -> None:
-    raise NotFoundError("Job ainda não está disponível neste ambiente.")
+@router.get("/jobs/{job_id}", response_model=JobView)
+def job(job_id: str, request: Request) -> JobView:
+    return jobs_of(request).get_job(job_id)
