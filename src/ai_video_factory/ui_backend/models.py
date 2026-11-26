@@ -148,6 +148,13 @@ class EventView(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class EventPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[EventView]
+    next_cursor: str | None = None
+
+
 class JobStatus(StrEnum):
     queued = "queued"
     running = "running"
