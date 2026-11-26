@@ -6,6 +6,7 @@ import { ProductionWorkspace } from "../features/productions/ProductionWorkspace
 import { ProfileList } from "../features/profiles/ProfileList";
 import { MemoryList } from "../features/memory/MemoryList";
 import { ToolsPage } from "../features/tools/ToolsPage";
+import { SettingsPage } from "../features/settings/SettingsPage";
 
 export const routes: RouteObject[] = [
   {
@@ -18,6 +19,7 @@ export const routes: RouteObject[] = [
       { path: "perfis", element: <ProfileList /> },
       { path: "memoria", element: <MemoryList /> },
       { path: "ferramentas", element: <ToolsPage /> },
+      { path: "configuracoes", element: <SettingsPage /> },
     ],
   },
 ];

@@ -43,4 +43,20 @@ describe("App shell", () => {
     expect(await screen.findByText("Nenhuma produção neste filtro.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Limpar filtro" })).toBeInTheDocument();
   });
+
+  it("abre configurações pelo menu principal", async () => {
+    const user = userEvent.setup();
+    const router = createMemoryRouter(routes, { initialEntries: ["/"] });
+    render(
+      <Providers>
+        <App router={router} />
+      </Providers>,
+    );
+
+    await user.click(screen.getByRole("link", { name: "Configurações" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Configurações", level: 1 }),
+    ).toBeInTheDocument();
+  });
 });

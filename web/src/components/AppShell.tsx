@@ -7,6 +7,7 @@ const LINKS = [
   { to: "/perfis", label: "Perfis" },
   { to: "/memoria", label: "Memória" },
   { to: "/ferramentas", label: "Ferramentas" },
+  { to: "/configuracoes", label: "Configurações" },
 ];
 
 export function AppShell({ children }: { children?: ReactNode }) {

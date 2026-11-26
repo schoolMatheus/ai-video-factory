@@ -39,6 +39,8 @@ porta 8765.
   autônoma de aprendizados não exige aprovação humana.
 - **Ferramentas:** estado instalado/configurado sem executar trabalho; o teste
   de conexão só acontece quando o operador clica.
+- **Configurações:** tela somente leitura com endereço local, versão da API e
+  capacidades reais do ambiente; nenhum campo é alterado nela.
 
 ## Recuperação e consistência
 
@@ -88,17 +90,17 @@ npm.cmd run test:e2e
 
 O Playwright inicia `scripts/e2e_serve.py`, um servidor somente loopback que
 cria artefatos e perfis de teste em um diretório temporário. Os cenários cobrem
-abertura do painel, recuperação após atualização e separação de memórias entre
-canais.
+abertura do painel, recuperação após atualização, separação de memórias entre
+canais e navegação até as configurações.
 
 ### Estado observado nesta entrega
 
 - Suíte da interface: 85 testes Python aprovados (um teste de symlink é ignorado
-  quando o Windows não concede o privilégio necessário) e 28 testes React
+  quando o Windows não concede o privilégio necessário) e 31 testes React
   aprovados.
 - Geração de tipos, `typecheck` e `build` concluídos sem erros.
-- Os três cenários Playwright foram executados contra o servidor controlado
-  `scripts/e2e_serve.py`: 3 aprovados. O runner usa um worker porque o bootstrap
+- Os quatro cenários Playwright foram executados contra o servidor controlado
+  `scripts/e2e_serve.py`: 4 aprovados. O runner usa um worker porque o bootstrap
   local é de uso único.
 - Suíte completa do repositório: 1207 testes passaram, 7 foram ignorados e
   nenhum falhou.
