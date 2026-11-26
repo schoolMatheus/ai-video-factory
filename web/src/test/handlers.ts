@@ -40,6 +40,7 @@ export const profiles: ProfileView[] = [
   {
     id: "canal-a",
     name: "Canal A",
+    niche: "astronomia",
     revision: 1,
     explicit_fields: ["language"],
     settings: { language: "pt-BR" },
@@ -49,6 +50,7 @@ export const profiles: ProfileView[] = [
   {
     id: "canal-b",
     name: "Canal B",
+    niche: "geologia",
     revision: 2,
     explicit_fields: [],
     settings: {},

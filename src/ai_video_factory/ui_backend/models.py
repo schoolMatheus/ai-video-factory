@@ -259,6 +259,7 @@ class ProfileView(BaseModel):
 
     id: str
     name: str
+    niche: str = ""
     revision: int
     settings: dict[str, Any] = Field(default_factory=dict)
     explicit_fields: list[str] = Field(default_factory=list)

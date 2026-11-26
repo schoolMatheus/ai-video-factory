@@ -155,6 +155,7 @@ def _profile_view(snapshot: Any) -> ProfileView:
     return ProfileView(
         id=snapshot.profile_id,
         name=getattr(snapshot, "name", snapshot.profile_id),
+        niche=getattr(snapshot, "niche", ""),
         revision=snapshot.revision,
         settings=dict(getattr(snapshot, "settings", {})),
         explicit_fields=list(getattr(snapshot, "explicit_fields", [])),

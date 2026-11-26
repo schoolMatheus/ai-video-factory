@@ -729,6 +729,11 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /**
+             * Niche
+             * @default
+             */
+            niche: string;
             problem?: components["schemas"]["ProblemView"] | null;
             /** Revision */
             revision: number;
