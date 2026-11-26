@@ -121,6 +121,9 @@ describe("Home", () => {
     expect(
       await screen.findByText("Nenhuma produção em andamento."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText("Nenhuma atividade registrada."),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/de 6 etapas concluídas/)).not.toBeInTheDocument();
   });
 });

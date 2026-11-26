@@ -63,7 +63,9 @@ export function Home() {
               const count = stageCount(item);
               return (
                 <li key={item.id} className={styles.row}>
-                  <Link to={`/producoes/${item.id}`}>{item.title}</Link>
+                  <Link className={styles.titleLink} to={`/producoes/${item.id}`}>
+                    {item.title}
+                  </Link>
                   <StatusText status={item.state} />
                   {count && <span className={styles.data}>{count}</span>}
                 </li>
@@ -82,7 +84,7 @@ export function Home() {
             onRetry={() => void events.refetch()}
           />
         )}
-        {featured && events.data?.items.length === 0 && (
+        {(!featured || events.data?.items.length === 0) && (
           <p className={styles.row}>Nenhuma atividade registrada.</p>
         )}
         {featured && events.data && events.data.items.length > 0 && (
@@ -120,7 +122,9 @@ export function Home() {
           <ul className={styles.list}>
             {profiles.data.items.map((profile) => (
               <li key={profile.id} className={styles.row}>
-                <Link to="/perfis">{profile.name}</Link>
+                <Link className={styles.titleLink} to="/perfis">
+                  {profile.name}
+                </Link>
                 <span className={styles.data}>{profile.niche || "sem nicho"}</span>
               </li>
             ))}

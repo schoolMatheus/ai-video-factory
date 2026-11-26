@@ -33,12 +33,12 @@
   font-size: var(--font-body);
 }
 
-.row > a {
+.titleLink {
   color: var(--text);
   text-decoration: none;
 }
 
-.row > a:hover {
+.titleLink:hover {
   color: var(--accent);
 }
 
