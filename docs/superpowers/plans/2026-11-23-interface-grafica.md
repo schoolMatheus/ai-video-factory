@@ -591,7 +591,7 @@ Executar cada tarefa com ciclo de teste de comportamento que falha, implementaç
 
 **Interfaces:** consumir aplicação real com domínio/transportes controlados; teste real de FilmCraft separado dos testes normais.
 
-- [ ] Executar jornadas E2E: criar produção, acompanhar seis etapas, inspecionar artefatos, corrigir uma etapa e ver a retomada.
+- [x] Executar jornadas E2E: criar produção, acompanhar seis etapas, inspecionar artefatos, corrigir uma etapa e ver a retomada.
 - [x] Testar duas abas, queda/reconexão SSE, refresh, fechamento da aba e reinício da API enquanto worker continua.
 - [x] Testar dois perfis com a mesma mídia e memórias diferentes; interface/API não misturam resultados.
 - [x] Testar player com vídeo longo, seek/Range e arquivo ausente; nenhuma leitura integral em memória no serviço.

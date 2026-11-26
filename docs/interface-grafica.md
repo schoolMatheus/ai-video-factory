@@ -93,15 +93,15 @@ canais.
 
 ### Estado observado nesta entrega
 
-- Suíte da interface: 81 testes Python e 28 testes React aprovados; um teste de
-  symlink é ignorado quando o Windows não concede o privilégio necessário.
+- Suíte da interface: 85 testes Python aprovados (um teste de symlink é ignorado
+  quando o Windows não concede o privilégio necessário) e 28 testes React
+  aprovados.
 - Geração de tipos, `typecheck` e `build` concluídos sem erros.
-- Os três cenários Playwright foram criados e listados pelo runner, mas não
-  executados: o download do `chromium_headless_shell` não concluiu neste
-  ambiente. O servidor controlado `scripts/e2e_serve.py` iniciou corretamente.
+- Os três cenários Playwright foram executados contra o servidor controlado
+  `scripts/e2e_serve.py`: 3 aprovados. O runner usa um worker porque o bootstrap
+  local é de uso único.
 - Suíte completa do repositório: 1207 testes passaram, 7 foram ignorados e
-  nenhum falhou. A suíte específica da interface (85 testes) passou.
+  nenhum falhou.
 - Nenhum upload/publicação automático foi adicionado.
 - Limitações registradas: execução real das etapas depende dos runners do plano
-  principal; integração FilmCraft depende de configuração local; a suíte completa
-  do repositório pode conter falhas preexistentes não relacionadas à interface.
+  principal; integração FilmCraft depende de configuração local.

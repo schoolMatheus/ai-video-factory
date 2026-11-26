@@ -12,11 +12,11 @@ test("perfis e memória não misturam canais", async ({ page, request }) => {
 
   await page.goto("/perfis");
   await expect(page.getByRole("heading", { name: "Perfis" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Canal canal-a" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "canal-a", exact: true })).toBeVisible();
 
   await page.goto("/memoria?perfil=canal-a");
-  await expect(page.getByText("Abertura longa demais")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Abertura longa demais" })).toBeVisible();
 
   await page.goto("/memoria?perfil=canal-b");
-  await expect(page.getByText("Abertura longa demais")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Abertura longa demais" })).toHaveCount(0);
 });
