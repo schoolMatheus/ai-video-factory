@@ -1,14 +1,46 @@
-"""Platform-specific locations for locally installed tools and fonts."""
+"""Platform-specific locations for locally installed tools and fonts.
+
+This module is the single public boundary for platform-sensitive paths and
+locks. Consumers must not import ``fcntl`` or ``msvcrt`` directly.
+"""
 
 import os
 from pathlib import Path
 import shutil
 
+from ai_video_factory.file_lock import exclusive_file_lock
+
 WINDOWS = os.name == "nt"
+
+__all__ = [
+    "WINDOWS",
+    "browser_candidates",
+    "exclusive_file_lock",
+    "font_candidates",
+    "remotion_commands",
+    "resolve_font",
+    "resolve_venv_executable",
+    "venv_program",
+    "windows_file_version",
+]
 
 
 def venv_program(root: Path, name: str) -> Path:
     return Path(root) / ("Scripts" if WINDOWS else "bin") / (f"{name}.exe" if WINDOWS else name)
+
+
+def resolve_venv_executable(venv: Path, name: str) -> Path:
+    """Resolve a program inside a virtual environment on the current platform."""
+    return venv_program(venv, name)
+
+
+def resolve_font() -> Path | None:
+    """First available caption font, or ``None`` when the host has none."""
+    for candidate in font_candidates():
+        path = Path(candidate)
+        if path.is_file():
+            return path
+    return None
 
 
 def font_candidates() -> tuple[str, ...]:

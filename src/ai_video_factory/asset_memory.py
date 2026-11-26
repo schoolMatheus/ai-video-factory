@@ -12,6 +12,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 _SCHEMA_VERSION = 1
 _ENV_VAR = "AI_VIDEO_FACTORY_ASSET_MEMORY"
@@ -30,6 +31,53 @@ def _default_path() -> Path:
     return Path("data") / "asset_memory.json"
 
 
+def scoped_memory_path(profile_id: str, *, data_dir: str | Path = "data") -> Path:
+    """Per-channel rejection file; technical history uses its own explicit scope."""
+    from ai_video_factory.profiles.store import TECHNICAL_SCOPE
+
+    if not profile_id or any(character in profile_id for character in "/\\.."):
+        raise ValueError("profile_id must be a safe path component")
+    root = Path(data_dir)
+    return root / "profiles" / profile_id / "asset_memory.json" if profile_id != TECHNICAL_SCOPE else root / "profiles" / TECHNICAL_SCOPE / "asset_memory.json"
+
+
+def import_legacy_rejections(store: Any, path: str | Path) -> int:
+    """Import the old global rejection file as unscoped technical history.
+
+    Legacy entries carry no channel identity. They are preserved for audit but
+    never promoted to a channel preference or used to block another channel's
+    editorial choices.
+    """
+    from ai_video_factory.profiles.models import Observation
+    from ai_video_factory.profiles.store import TECHNICAL_SCOPE
+    from uuid import uuid4
+
+    source = Path(path)
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    entries = raw.get("rejections", {}) if isinstance(raw, dict) else {}
+    imported = 0
+    for asset_id, entry in (entries.items() if isinstance(entries, dict) else []):
+        observation = Observation(
+            observation_id=uuid4().hex,
+            profile_id=TECHNICAL_SCOPE,
+            scope="technical",
+            production_id=None,
+            stage="media",
+            attempt=1,
+            type="legacy_technical_rejection",
+            source="asset_memory.json",
+            summary=f"legacy rejection for {asset_id}: {entry.get('reason', 'unknown')}",
+            evidence_refs=[str(source)],
+            event_key=f"legacy:{asset_id}",
+        )
+        store.record_technical_observation(observation)
+        imported += 1
+    return imported
+
+
 def _tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z0-9]+", text.lower())
     out = set()
@@ -46,7 +94,21 @@ def _tokenize(text: str) -> set[str]:
 class AssetMemory:
     """JSON-backed blocklist of rejected assets."""
 
-    def __init__(self, path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        path: str | Path | None = None,
+        *,
+        scope: str = "channel",
+        profile_id: str | None = None,
+    ) -> None:
+        # Every memory access must state its scope. ``profile_id=None`` never
+        # means unrestricted access; it only allows the legacy explicit path.
+        if scope not in {"channel", "technical"}:
+            raise ValueError("scope must be 'channel' or 'technical'")
+        if scope == "channel" and profile_id is None and path is None:
+            raise ValueError("channel-scoped memory requires profile_id or an explicit path")
+        self.scope = scope
+        self.profile_id = profile_id
         self.path = Path(path) if path is not None else _default_path()
         self._entries: dict[str, dict] = {}
         self._load()
@@ -75,16 +137,35 @@ class AssetMemory:
     # -- public API -----------------------------------------------------
 
     def is_blocked(self, asset_id: str) -> bool:
-        """True when this asset ID or URL was rejected before."""
-        return asset_id in self._entries
+        """True when this asset ID or URL was rejected in the current scope.
 
-    def record_rejection(self, asset_id: str, reason: str, source: str = "") -> None:
-        """Block an asset, remembering why and bumping its reject count."""
+        A shared technical memory never carries editorial rejections: those
+        remain in each channel's own file.
+        """
+        entry = self._entries.get(asset_id)
+        if entry is None:
+            return False
+        if self.scope == "technical" and entry.get("classification") != "technical":
+            return False
+        return True
+
+    def record_rejection(
+        self,
+        asset_id: str,
+        reason: str,
+        source: str = "",
+        *,
+        classification: str = "editorial",
+    ) -> None:
+        """Block an asset with an explicit technical/editorial classification."""
+        if classification not in {"technical", "editorial"}:
+            raise ValueError("classification must be 'technical' or 'editorial'")
         now = time.time()
         entry = self._entries.get(asset_id, {})
         self._entries[asset_id] = {
             "reason": reason,
             "source": source,
+            "classification": classification,
             "rejected_at": now,
             "first_rejected_at": entry.get("first_rejected_at", now),
             "count": int(entry.get("count", 0)) + 1,
