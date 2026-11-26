@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import StreamingResponse
 
 from ai_video_factory.ui_backend import domain
 from ai_video_factory.ui_backend.models import (
@@ -18,7 +22,9 @@ from ai_video_factory.ui_backend.models import (
     StageStatus,
     StageView,
 )
+from ai_video_factory.ui_backend.events import EventService
 from ai_video_factory.ui_backend.read_models import ProductionReadModels
+from ai_video_factory.sanitization import sanitize_diagnostic
 from ai_video_factory.ui_backend.session import (
     CSRF_COOKIE,
     CSRF_HEADER,
@@ -115,15 +121,59 @@ def stage(production_id: str, stage: StageName, request: Request) -> StageView:
     return models.get_stage(production_id, stage)
 
 
+def events_of(request: Request) -> EventService:
+    events = request.app.state.services.events
+    if events is None:
+        from ai_video_factory.ui_backend.models import DependencyUnavailableError
+
+        raise DependencyUnavailableError("Journal de eventos não disponível.")
+    return events
+
+
 @router.get("/productions/{production_id}/events", response_model=EventPage)
 def events(
     production_id: str,
     request: Request,
     after_cursor: str | None = None,
 ) -> EventPage:
-    _, _, models = services_of(request)
-    items = models.list_events(production_id, after_cursor)
+    items = events_of(request).replay(production_id, after_cursor)
     return EventPage(items=items, next_cursor=items[-1].id if items else None)
+
+
+@router.get("/productions/{production_id}/stream")
+async def stream(production_id: str, request: Request) -> StreamingResponse:
+    event_service = events_of(request)
+    event_service.read_models.get_production(production_id)
+    last_event_id = request.headers.get("last-event-id")
+    cursor = (
+        event_service.cursor_for_event(production_id, last_event_id)
+        if last_event_id
+        else event_service.snapshot_cursor(production_id)
+    )
+
+    settings = request.app.state.settings
+
+    async def frames():
+        stream = event_service.subscribe(
+            production_id,
+            cursor,
+            poll_interval=settings.sse_poll_interval,
+            max_polls=settings.sse_max_polls,
+            heartbeat_after=settings.sse_heartbeat_after,
+            should_stop=request.is_disconnected,
+        )
+        async for event in stream:
+            data = sanitize_diagnostic(
+                json.dumps(event.payload, sort_keys=True, ensure_ascii=False)
+            )
+            yield f"id: {event.id}\nevent: {event.type}\ndata: {data}\n\n"
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(
+        frames(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/productions/{production_id}/actions", response_model=OperationReceipt)

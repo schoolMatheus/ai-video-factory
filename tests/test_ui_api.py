@@ -15,13 +15,14 @@ class _ClientFactory:
         self.tmp_path = tmp_path
         self.bootstrap = BootstrapService(tmp_path / "bootstrap.token")
 
-    def client(self, *, authenticated: bool = True):
+    def client(self, *, authenticated: bool = True, **settings_kwargs):
         from fastapi.testclient import TestClient
 
         app = create_app(
             UiSettings(
                 project_root=self.tmp_path,
                 data_root=self.tmp_path / "data",
+                **settings_kwargs,
             ),
             bootstrap=self.bootstrap,
         )
@@ -186,3 +187,41 @@ def test_missing_production_returns_not_found(factory: _ClientFactory) -> None:
     response = factory.client().get("/api/v1/productions/" + "0" * 32)
 
     assert response.status_code == 404
+
+
+def test_expired_cursor_requires_new_snapshot(factory: _ClientFactory, tmp_path: Path) -> None:
+    run = _make_run(tmp_path)
+    http = factory.client()
+
+    response = http.get(
+        f"/api/v1/productions/{run.run_id}/events",
+        params={"after_cursor": "invalid-cursor"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "cursor_expired"
+
+
+def test_sse_stream_continues_from_last_event_id(
+    factory: _ClientFactory, tmp_path: Path
+) -> None:
+    run = _make_run(tmp_path)
+    http = factory.client(sse_poll_interval=0.0, sse_max_polls=1, sse_heartbeat_after=99)
+    first = http.get(f"/api/v1/productions/{run.run_id}/events").json()
+    cursor = first["items"][0]["id"]
+    event_path = tmp_path / "state" / "research" / run.run_id / "events.jsonl"
+    with event_path.open("a", encoding="utf-8") as events_file:
+        events_file.write(
+            '{"timestamp":"2026-11-23T00:00:00+00:00","run_id":"'
+            + run.run_id
+            + '","stage":"research","event":"source_found","fields":{}}\n'
+        )
+
+    response = http.get(
+        f"/api/v1/productions/{run.run_id}/stream",
+        headers={"Last-Event-ID": cursor},
+    )
+
+    assert response.status_code == 200
+    assert "source_found" in response.text
+    assert "run_started" not in response.text

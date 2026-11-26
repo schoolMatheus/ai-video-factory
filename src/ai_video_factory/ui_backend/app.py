@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from ai_video_factory.ui_backend.events import EventService
 from ai_video_factory.ui_backend.models import (
     InvalidRequestError,
     ProblemView,
@@ -36,6 +37,9 @@ class UiSettings:
     static_dir: Path | None = None
     bind_host: str = "127.0.0.1"
     port: int = 8765
+    sse_poll_interval: float = 1.0
+    sse_max_polls: int = 3600
+    sse_heartbeat_after: int = 4
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,7 @@ class UiServices:
     read_models: ProductionReadModels
     sessions: SessionService
     bootstrap: BootstrapService
+    events: EventService | None = None
 
 
 def _problem_response(status_code: int, problem: ProblemView) -> JSONResponse:
@@ -75,10 +80,13 @@ def create_app(
         bootstrap=bootstrap or BootstrapService(data_root / "ui" / "bootstrap.token"),
     )
     if bootstrap is not None:
-        services = UiServices(
-            read_models=services.read_models,
-            sessions=services.sessions,
-            bootstrap=bootstrap,
+        services = replace(services, bootstrap=bootstrap)
+    if services.events is None:
+        control_db = Path(
+            settings.control_db or data_root / "ui" / "control.sqlite3"
+        )
+        services = replace(
+            services, events=EventService(services.read_models, control_db)
         )
 
     app = FastAPI(
