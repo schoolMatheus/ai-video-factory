@@ -346,9 +346,13 @@ def action(
 ) -> OperationReceipt:
     _, _, models = services_of(request)
     models.get_production(production_id)
-    capability = "editor" if action_request.action == "open_editor" else "staged_flow"
-    domain.require_capability(capability)
-    raise NotFoundError("Ação ainda não executável neste ambiente.")
+    result = domain.execute_action(production_id, action_request)
+    return OperationReceipt(
+        job_id=result.production_id,
+        production_id=result.production_id,
+        status="queued",
+        accepted=True,
+    )
 
 
 @router.get("/profiles/{profile_id}/productions", response_model=ProductionPage)

@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { EditingView } from "./EditingView";
 import { MediaView } from "./MediaView";
 import { NarrationView } from "./NarrationView";
 import { ResearchView } from "./ResearchView";
+import { ReviewView } from "./ReviewView";
 import { ScriptView } from "./ScriptView";
 
 describe("Stage inspectors", () => {
@@ -94,6 +96,29 @@ describe("Stage inspectors", () => {
     );
 
     expect(screen.getByText("Licença: CC BY-SA 4.0")).toBeInTheDocument();
+  });
+
+  it("desabilita ação do editor quando a capacidade não está disponível", () => {
+    render(
+      <EditingView
+        actions={[
+          {
+            action: "open_editor",
+            enabled: false,
+            reason: "Editor não configurado.",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Abrir projeto" })).toBeDisabled();
+    expect(screen.getByText(/exportação bem-sucedida não comprova/)).toBeInTheDocument();
+  });
+
+  it("não anuncia pacote nem publicação automática na revisão", () => {
+    render(<ReviewView />);
+
+    expect(screen.getByText(/Nenhum upload é feito automaticamente/)).toBeInTheDocument();
   });
 
   it("comunica bundle ausente em vez de inventar conteúdo", () => {

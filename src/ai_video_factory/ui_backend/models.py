@@ -145,6 +145,18 @@ class ProductionPage(BaseModel):
     next_cursor: str | None = None
 
 
+class ProductionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    production_id: str
+    status: str
+    note: str = ""
+    stage: StageName | None = None
+    artifacts: list[str] = Field(default_factory=list)
+    invalidated_stages: list[StageName] = Field(default_factory=list)
+    problems: list[ProblemView] = Field(default_factory=list)
+
+
 class PreflightView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

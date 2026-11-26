@@ -4,15 +4,23 @@ import { useParams } from "react-router-dom";
 import { getProduction, listEvents } from "../../api/client";
 import { ProductionEventStream, type StreamStatus } from "../../api/events";
 import { queryKeys } from "../../api/queryKeys";
-import type { EventView, Progress, StageName, StageView } from "../../api/types";
+import type {
+  ActionAvailability,
+  EventView,
+  Progress,
+  StageName,
+  StageView,
+} from "../../api/types";
 import { ActivityFeed } from "../../components/ActivityFeed";
 import { ArtifactViewer } from "../../components/ArtifactViewer";
 import { InlineError } from "../../components/InlineError";
 import { StageList } from "../../components/StageList";
 import { StatusText } from "../../components/StatusText";
+import { EditingView } from "../stages/EditingView";
 import { MediaView } from "../stages/MediaView";
 import { NarrationView } from "../stages/NarrationView";
 import { ResearchView } from "../stages/ResearchView";
+import { ReviewView } from "../stages/ReviewView";
 import { ScriptView } from "../stages/ScriptView";
 import styles from "./ProductionWorkspace.module.css";
 
@@ -34,7 +42,13 @@ function formatProgress(progress: Progress | null | undefined): string | null {
   return `${progress.completed} de ${progress.total} ${unit}`;
 }
 
-function StageInspector({ stage }: { stage: StageView | undefined }) {
+function StageInspector({
+  stage,
+  actions,
+}: {
+  stage: StageView | undefined;
+  actions: ActionAvailability[];
+}) {
   if (!stage) return <p>Selecione uma etapa.</p>;
   const progress = formatProgress(stage.progress);
   return (
@@ -56,6 +70,10 @@ function StageInspector({ stage }: { stage: StageView | undefined }) {
       {stage.name === "script" && <ScriptView />}
       {stage.name === "narration" && <NarrationView />}
       {stage.name === "media" && <MediaView />}
+      {stage.name === "editing" && (
+        <EditingView actions={actions} />
+      )}
+      {stage.name === "review" && <ReviewView />}
       {(stage.artifacts ?? []).map((artifact) => (
         <ArtifactViewer key={artifact.id} artifact={artifact} />
       ))}
@@ -196,7 +214,7 @@ export function ProductionWorkspace() {
             <p className={styles.count}>{completed} de 6 etapas concluídas</p>
             <StageList stages={stages} selected={selected} onSelect={setSelected} />
           </div>
-          <StageInspector stage={stage} />
+          <StageInspector stage={stage} actions={snapshot.data.capabilities ?? []} />
         </div>
       )}
       {tab === "files" && (
