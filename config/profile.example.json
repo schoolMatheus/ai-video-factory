@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "profile_id": "meu-canal",
+  "name": "Meu canal",
+  "language": "pt-BR",
+  "niche": "a definir pelo operador",
+  "settings": {
+    "editing.width": 1920,
+    "editing.height": 1080,
+    "editing.fps": 30,
+    "narration.voice": "a definir apos piloto",
+    "media.candidates_per_shot": 3
+  },
+  "explicit_fields": ["narration.voice"],
+  "review_policy": {
+    "required_checks": ["resolution", "duration", "rights"],
+    "require_rights": true,
+    "require_human_approval_for_publication": true
+  },
+  "learning_policy": {
+    "allow_autonomous_activation": true,
+    "require_evaluation": true,
+    "require_evidence": true,
+    "allowed_scopes": ["channel"]
+  },
+  "operation_budget": {
+    "max_external_calls": 60,
+    "max_attempts_per_stage": 3
+  }
+}

@@ -232,6 +232,26 @@ def check_music_bed(
     )
 
 
+def check_filmcraft_bridge(config_path: Path | None = None) -> CheckResult:
+    """Read-only diagnosis of the optional FilmCraft MCP configuration."""
+    from ai_video_factory.integrations.filmcraft import load_filmcraft_config
+
+    config = load_filmcraft_config(config_path)
+    if config is None:
+        return CheckResult("filmcraft_bridge", STATUS_WARN, "config/filmcraft.toml ausente; integração opcional")
+    if not config.command:
+        return CheckResult("filmcraft_bridge", STATUS_WARN, "comando MCP não configurado")
+    import shutil
+
+    resolved = shutil.which(config.command)
+    if resolved is None:
+        return CheckResult("filmcraft_bridge", STATUS_WARN, f"executável {config.command!r} não encontrado no PATH")
+    return CheckResult(
+        "filmcraft_bridge", STATUS_PASS,
+        f"modo={config.mode}, executável={resolved}, timeout={config.timeout_seconds}s",
+    )
+
+
 def check_caption_fonts() -> CheckResult:
     """A real TTF is available for caption/thumbnail text rendering."""
     found = [p for p in _CAPTION_FONT_CANDIDATES if Path(p).is_file()]

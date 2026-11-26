@@ -14,6 +14,12 @@ logs/
 data/projects/
 data/system/
 
+# versioned channel profiles and scoped memory (machine-local state)
+data/profiles/*.sqlite3
+data/profiles/*.sqlite3-*
+data/profiles/*/asset_memory.json
+config/filmcraft.toml
+
 # item11 LTX-2 backend (large, machine-local)
 .venv-ltx2/
 *-install.log
@@ -29,3 +35,11 @@ runs/
 # downloaded music beds (recreated via music providers; keep ATTRIBUTION.md)
 assets/music/*.wav
 assets/music/*.flac
+
+# local UI control state and generated artifacts
+data/ui/
+web/dist/
+web/openapi.json
+web/*.log
+web/*.tsbuildinfo
+src/ai_video_factory/ui_static/

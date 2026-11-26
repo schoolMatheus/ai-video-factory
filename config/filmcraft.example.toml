@@ -1,0 +1,18 @@
+# Exemplo sem segredos: copie para config/filmcraft.toml e ajuste ao ambiente.
+# O segredo do bridge é herdado do ambiente (FILMCRAFT_BRIDGE_SECRET) e nunca
+# deve ser escrito aqui, no perfil, no SQLite ou nos logs.
+
+[filmcraft]
+mode = "bridge"            # bridge (app aberto) ou headless (evolução futura)
+command = ""               # executável do servidor MCP que acompanha o FilmCraft
+args = []
+timeout_seconds = 30.0
+secret_env = "FILMCRAFT_BRIDGE_SECRET"
+
+[filmcraft.commands]
+inspect = "inspect_project"
+import = "import_media"
+insert = "insert_item"
+save = "save_project"
+preview = "render_preview"
+export = "export_project"

@@ -244,12 +244,18 @@ class ProfileStore:
         ).fetchone()
         if row is None:
             raise NotFound(f"profile {profile_id} was not found")
+        return ProfileStore._snapshot_at(connection, profile_id, int(row["current_revision"]))
+
+    @staticmethod
+    def _snapshot_at(
+        connection: sqlite3.Connection, profile_id: str, revision: int
+    ) -> ProfileSnapshot | None:
         snapshot_row = connection.execute(
             "SELECT snapshot_json FROM profile_revisions WHERE profile_id = ? AND revision = ?",
-            (profile_id, row["current_revision"]),
+            (profile_id, revision),
         ).fetchone()
         if snapshot_row is None:
-            raise NotFound(f"profile {profile_id} has no current snapshot")
+            return None
         return ProfileSnapshot.model_validate(json.loads(snapshot_row["snapshot_json"]))
 
     @staticmethod
@@ -663,9 +669,15 @@ class ProfileStore:
                 (revision.model_dump_json(), learning_id),
             )
             active_ids = [item for item in snapshot.active_learning_ids if item != learning_id]
+            # Rebuild from the revision before activation so the suspended
+            # patch is actually removed from effective settings.
+            base = self._snapshot_at(connection, profile_id, snapshot.revision - 1) or snapshot
             restored = self._rebuild_snapshot(
-                snapshot, active_ids, connection, reason=f"suspended learning {learning_id}"
+                base, active_ids, connection,
+                reason=f"suspended learning {learning_id}",
+                revision=snapshot.revision + 1,
             )
+            self._insert_snapshot(connection, restored, f"suspended learning {learning_id}")
             connection.execute(
                 "INSERT INTO memory_events (profile_id, kind, ref_id, detail_json, created_at) "
                 "VALUES (?, 'learning_suspended', ?, ?, ?)",
@@ -740,6 +752,7 @@ class ProfileStore:
         *,
         payload: dict[str, Any] | None = None,
         reason: str,
+        revision: int | None = None,
     ) -> ProfileSnapshot:
         if payload is None:
             payload = {
@@ -767,7 +780,7 @@ class ProfileStore:
                     for policy_name, values in applied["policies"].items():
                         payload["policies"][policy_name].update(values)
                     payload["budget"].update(applied["budget"])
-        revision = snapshot.revision + 1
+        revision = revision if revision is not None else snapshot.revision + 1
         from ai_video_factory.profiles.models import (
             LearningPolicy,
             OperationBudget,

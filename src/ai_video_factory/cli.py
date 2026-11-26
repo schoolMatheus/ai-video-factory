@@ -11,10 +11,12 @@ from ai_video_factory.inference_config import load_inference_config
 from ai_video_factory.inference_models import InferenceCheck, InferenceResult
 from ai_video_factory.inference_service import InferenceService
 from ai_video_factory.pipeline import failed_pipeline_result, run_synthetic_pipeline
+from ai_video_factory.profile_cli import profile_app
 from ai_video_factory.run_store import RunStore
 from ai_video_factory.sanitization import sanitize_diagnostic
 from ai_video_factory.theme import resolve_theme
 from ai_video_factory.video_pipeline import VideoJob, run_video_pipeline
+from ai_video_factory.workflow_cli import workflow_app
 from ai_video_factory.youtube import (
     DEFAULT_PRIVACY,
     PRIVACY_CHOICES,
@@ -42,6 +44,8 @@ scheduler_app = typer.Typer(no_args_is_help=True)
 app.add_typer(scheduler_app, name="scheduler")
 review_app = typer.Typer(no_args_is_help=True)
 app.add_typer(review_app, name="review")
+app.add_typer(profile_app, name="profiles")
+app.add_typer(workflow_app, name="workflow")
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DATA_ROOT = _PROJECT_ROOT / "data"

@@ -62,6 +62,25 @@ TTS model. Producing a video from a topic also requires configuring narration,
 an OpenAI-compatible model endpoint, and media sources. See
 [Windows setup and limitations](docs/windows.md).
 
+## Staged workflow (opt-in)
+
+A second, versioned production path is available alongside the legacy
+`video-pipeline`. It uses six resumable stages — research, script, narration,
+media, FilmCraft editing and review — driven by an explicit channel profile
+with scoped, autonomous memory. The legacy commands and approval policy stay
+unchanged; the new path ends with a review package and never uploads.
+
+```powershell
+ai-video-factory profiles create --from-file config/profile.example.json
+ai-video-factory workflow run --profile meu-canal --topic "Tema do episódio" --dry-run
+ai-video-factory workflow run --profile meu-canal --topic "Tema do episódio" --through script
+ai-video-factory workflow resume --profile meu-canal --production <production-id>
+```
+
+FilmCraft is connected through its native MCP server; see
+[docs/filmcraft-setup.md](docs/filmcraft-setup.md). Profile memory, precedence,
+backup and recovery are documented in [docs/profile-memory.md](docs/profile-memory.md).
+
 ### Linux
 
 Prerequisites: Python 3.12, [uv](https://docs.astral.sh/uv/), FFmpeg with
