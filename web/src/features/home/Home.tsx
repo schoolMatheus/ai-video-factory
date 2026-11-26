@@ -14,9 +14,11 @@ const SEVERITY: Record<string, string> = {
 };
 
 function stageCount(production: ProductionView): string | null {
-  const stages = production.stages ?? [];
-  if (stages.length === 0) return null;
-  const completed = stages.filter((item) => item.status === "completed").length;
+  const observed = (production.stages ?? []).filter(
+    (item) => item.observed !== false,
+  );
+  if (observed.length === 0) return null;
+  const completed = observed.filter((item) => item.status === "completed").length;
   return `${completed} de 6 etapas concluídas`;
 }
 
@@ -33,7 +35,9 @@ export function Home() {
   });
 
   const items = productions.data?.items ?? [];
-  const featured = items.find((item) => item.state === "running") ?? items[0];
+  const running = items.filter((item) => item.state === "running");
+  const shown = running.length > 0 ? running : items;
+  const featured = running[0] ?? items[0];
   const events = useQuery({
     queryKey: queryKeys.events(featured?.id ?? ""),
     queryFn: () => listEvents(featured?.id ?? ""),
@@ -54,18 +58,21 @@ export function Home() {
             onRetry={() => void productions.refetch()}
           />
         )}
-        {productions.isSuccess && items.length === 0 && (
+        {productions.isSuccess && shown.length === 0 && (
           <p className={styles.row}>Nenhuma produção em andamento.</p>
         )}
-        {productions.isSuccess && items.length > 0 && (
+        {productions.isSuccess && shown.length > 0 && (
           <ul className={styles.list}>
-            {items.map((item) => {
+            {shown.map((item) => {
               const count = stageCount(item);
               return (
                 <li key={item.id} className={styles.row}>
                   <Link className={styles.titleLink} to={`/producoes/${item.id}`}>
                     {item.title}
                   </Link>
+                  <span className={styles.meta}>
+                    {item.profile_id ?? "Legado — sem perfil"}
+                  </span>
                   <StatusText status={item.state} />
                   {count && <span className={styles.data}>{count}</span>}
                 </li>
@@ -84,22 +91,26 @@ export function Home() {
             onRetry={() => void events.refetch()}
           />
         )}
-        {(!featured || events.data?.items.length === 0) && (
-          <p className={styles.row}>Nenhuma atividade registrada.</p>
-        )}
+        {productions.isSuccess &&
+          (!featured || (events.isSuccess && events.data.items.length === 0)) && (
+            <p className={styles.row}>Nenhuma atividade registrada.</p>
+          )}
         {featured && events.data && events.data.items.length > 0 && (
           <ul className={styles.list}>
-            {events.data.items.slice(0, 6).map((event) => (
-              <li key={event.id} className={styles.row}>
-                <span>{event.type}</span>
-                <span className={styles.meta}>
-                  {SEVERITY[event.severity] ?? event.severity}
-                </span>
-                <time className={styles.data}>
-                  {event.timestamp ?? "horário não informado"}
-                </time>
-              </li>
-            ))}
+            {events.data.items
+              .slice(-6)
+              .reverse()
+              .map((event) => (
+                <li key={event.id} className={styles.row}>
+                  <span>{event.type}</span>
+                  <span className={styles.meta}>
+                    {SEVERITY[event.severity] ?? event.severity}
+                  </span>
+                  <time className={styles.data}>
+                    {event.timestamp ?? "horário não informado"}
+                  </time>
+                </li>
+              ))}
           </ul>
         )}
       </section>
