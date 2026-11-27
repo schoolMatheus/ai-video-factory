@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from ai_video_factory.profiles.context import resolve_settings
 from ai_video_factory.profiles.models import ProfileSnapshot
 from ai_video_factory.profiles.models import canonical_digest
 from ai_video_factory.workflow.models import (
@@ -29,7 +30,7 @@ def build_assembly(
     media: MediaBundle,
     snapshot: ProfileSnapshot,
 ) -> AssemblyPlan:
-    settings = snapshot.settings
+    settings = resolve_settings(snapshot.settings)
     width = int(settings.get("editing.width", 1920))
     height = int(settings.get("editing.height", 1080))
     fps = int(settings.get("editing.fps", 30))

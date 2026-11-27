@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from ai_video_factory.profiles.context import resolve_setting
 from ai_video_factory.profiles.models import MemoryContext, ProfileSnapshot, StageName
 from ai_video_factory.workflow.models import (
     EditorCapabilities,
@@ -44,13 +45,8 @@ class StageContext:
         return self.request.language or self.snapshot.language
 
     def setting(self, path: str, default: Any = None) -> Any:
-        """Read a dot-separated setting from the effective stage settings."""
-        value: Any = self.effective_settings
-        for part in path.split("."):
-            if not isinstance(value, dict) or part not in value:
-                return default
-            value = value[part]
-        return value
+        """Read a setting through the one canonical resolver used by all runners."""
+        return resolve_setting(self.effective_settings, path, default)
 
 
 class StageRunner(Protocol):
