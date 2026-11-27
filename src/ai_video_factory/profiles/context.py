@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from ai_video_factory.profiles.models import (
@@ -32,11 +33,41 @@ def _namespace(key: str) -> str:
     return key.split(".", 1)[0]
 
 
+def resolve_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the one canonical, flat representation of profile settings.
+
+    The profile convention uses dotted keys such as ``narration.voice``. Nested
+    dictionaries are flattened to that same shape, but when the same resolved
+    key exists in both forms the input is ambiguous: reject it instead of
+    choosing silently (one reader could then apply a value another ignores).
+    """
+    flat: dict[str, Any] = {}
+    scalar_keys = {str(key) for key, value in settings.items() if not isinstance(value, dict)}
+
+    def walk(prefix: str, value: Mapping[str, Any]) -> None:
+        for key, item in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(item, dict):
+                walk(path, item)
+                continue
+            if (prefix and path in scalar_keys) or path in flat:
+                raise ValueError(f"configuração ambígua: {path} usa representação plana e aninhada")
+            flat[path] = item
+
+    walk("", settings)
+    return flat
+
+
+def resolve_setting(settings: Mapping[str, Any], path: str, default: Any = None) -> Any:
+    """Read one setting from the canonical flat representation."""
+    return resolve_settings(settings).get(path, default)
+
+
 def _relevant_settings(snapshot: ProfileSnapshot, stage: StageName) -> dict[str, Any]:
     prefixes = STAGE_SETTING_PREFIXES[stage]
     return {
         key: value
-        for key, value in snapshot.settings.items()
+        for key, value in resolve_settings(snapshot.settings).items()
         if _namespace(key) in prefixes
     }
 
@@ -72,6 +103,17 @@ def _compatible(learning: LearningRevision, snapshot: ProfileSnapshot) -> bool:
     return all(snapshot.tool_versions.get(tool) == version for tool, version in required.items())
 
 
+def _condition_applies(learning: LearningRevision, topic: str) -> bool:
+    """Only rules whose application condition is met may change settings."""
+    condition = (learning.condition or "always").strip()
+    if condition in {"always", ""}:
+        return True
+    if condition.startswith("topic:"):
+        token = condition.split(":", 1)[1].casefold()
+        return bool(token) and token in _token_set(topic)
+    return False
+
+
 def build_memory_context(
     store: ProfileStore,
     snapshot: ProfileSnapshot,
@@ -93,17 +135,19 @@ def build_memory_context(
         for learning in store.list_learnings(snapshot.profile_id, stage=stage)
         if learning.learning_id in snapshot.active_learning_ids
         and _compatible(learning, snapshot)
+        and _condition_applies(learning, topic)
     ]
-    resolved = dict(snapshot.settings)
-    # Learnings are applied in a stable order; explicit channel choices win.
+    # Start from explicit baseline settings when available: a learning whose
+    # condition/tool version no longer applies must have no effect, not merely
+    # a hidden id.
+    resolved = store.base_settings(snapshot.profile_id) or resolve_settings(snapshot.settings)
+    # Learnings are applied in a stable order; explicit channel choices win
+    # because an explicit key is never overwritten by an inferred value.
     for learning in sorted(learnings, key=lambda item: item.learning_id):
         payload = learning.action.apply(snapshot)
-        for key, value in payload["settings"].items():
+        for key, value in resolve_settings(payload["settings"]).items():
             if key not in snapshot.explicit_fields:
                 resolved[key] = value
-    for field in snapshot.explicit_fields:
-        if field in snapshot.settings:
-            resolved[field] = snapshot.settings[field]
 
     topic_tokens = _token_set(topic)
     observations = [
@@ -133,7 +177,6 @@ def build_memory_context(
     digest = canonical_digest(
         {
             "profile_id": snapshot.profile_id,
-            "revision": snapshot.revision,
             "stage": stage,
             "topic": topic,
             "rules": rules,

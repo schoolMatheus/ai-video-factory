@@ -52,7 +52,7 @@ export class FakeEventSource {
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
-  readonly listeners = new Map<string, Array<() => void>>();
+  readonly listeners = new Map<string, Array<(event: MessageEvent<string>) => void>>();
 
   constructor(
     readonly url: string,
@@ -61,14 +61,15 @@ export class FakeEventSource {
     FakeEventSource.instances.push(this);
   }
 
-  addEventListener(type: string, listener: () => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent<string>) => void): void {
     const existing = this.listeners.get(type) ?? [];
     existing.push(listener);
     this.listeners.set(type, existing);
   }
 
-  emit(type: string): void {
-    for (const listener of this.listeners.get(type) ?? []) listener();
+  emit(type: string, data = "{}", lastEventId = ""): void {
+    const message = { data, lastEventId } as MessageEvent<string>;
+    for (const listener of this.listeners.get(type) ?? []) listener(message);
   }
 
   close(): void {

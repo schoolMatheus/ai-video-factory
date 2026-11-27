@@ -7,6 +7,7 @@ pass policy checks and evaluation may be activated.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -92,7 +93,9 @@ def evaluate_and_apply(
     })
     store.save_candidate(candidate)
 
-    evidence_valid = bool(candidate.evidence_ids) and _evidence_is_trusted(store, candidate)
+    evidence_valid = bool(candidate.evidence_ids) and _evidence_is_trusted(
+        store, candidate, Path(context.project_dir)
+    )
     scope_ok = candidate.scope in policy.allowed_scopes
     patch_ok = _patch_allowed(context.snapshot, candidate.change)
     if candidate.evaluator == "editorial" and not evidence_valid:
@@ -118,8 +121,12 @@ def evaluate_and_apply(
         )
     store.save_evaluation(evaluation)
 
+    trial_ok = bool(evaluation.trial.strip()) and bool(evaluation.checks) and all(
+        item.passed for item in evaluation.checks
+    )
     can_activate = (
         evaluation.result == "pass"
+        and trial_ok
         and policy.allow_autonomous_activation
         and (not policy.require_evaluation or evaluation.checks or evaluator is not None)
         and (not policy.require_evidence or evidence_valid)
@@ -132,7 +139,7 @@ def evaluate_and_apply(
             "learning_id": None,
             "candidate_id": candidate.candidate_id,
             "evaluation_id": evaluation.evaluation_id,
-            "status": "hypothesis" if not evidence_valid else "proposed",
+            "status": "hypothesis" if not (evidence_valid and trial_ok) else "proposed",
         }
 
     snapshot = store.get_snapshot(context.snapshot.profile_id)
@@ -154,13 +161,22 @@ def evaluate_and_apply(
     }
 
 
-def _evidence_is_trusted(store: ProfileStore, candidate: LearningCandidate) -> bool:
+def _evidence_is_trusted(
+    store: ProfileStore, candidate: LearningCandidate, root: Path
+) -> bool:
+    """An event key alone is not evidence: a persisted artifact must exist."""
     try:
         observations = store.list_observations(candidate.profile_id)
     except Exception:  # noqa: BLE001 - unreadable store is not evidence
         return False
     trusted = {item.event_key: item for item in observations if item.source not in _FORBIDDEN_SOURCES}
-    return all(item in trusted for item in candidate.evidence_ids)
+    for key in candidate.evidence_ids:
+        observation = trusted.get(key)
+        if observation is None or not observation.evidence_refs:
+            return False
+        if not any((root / ref).is_file() for ref in observation.evidence_refs):
+            return False
+    return True
 
 
 def _patch_allowed(snapshot: ProfileSnapshot, patch: TypedPatch) -> bool:

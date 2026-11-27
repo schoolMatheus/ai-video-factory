@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import inspect
-import json
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 from ai_video_factory.ui_backend.control_store import ControlStore
-from ai_video_factory.ui_backend.models import ConflictError, EventView
+from ai_video_factory.ui_backend.cursors import decode_cursor, encode_cursor
+from ai_video_factory.ui_backend.models import ConflictError, EventView, NotFoundError
 from ai_video_factory.ui_backend.read_models import ProductionReadModels
 
 
@@ -23,25 +22,37 @@ class CursorExpired(ConflictError):
 
 
 class EventService:
-    def __init__(self, read_models: ProductionReadModels, control_db: Path) -> None:
+    def __init__(
+        self,
+        read_models: ProductionReadModels,
+        control_db: Path,
+        staged_factory: Any = None,
+    ) -> None:
         self.read_models = read_models
         self.store = ControlStore(control_db)
+        self.staged_factory = staged_factory
+
+    def _models_for(self, production_id: str) -> Any:
+        """Legacy manifests or a staged production project, whichever exists."""
+        try:
+            self.read_models.get_production(production_id)
+            return self.read_models
+        except NotFoundError:
+            staged = self.staged_factory(production_id) if self.staged_factory else None
+            if staged is None:
+                raise
+            return staged
 
     # -- cursors -----------------------------------------------------------
 
     def _encode_cursor(self, production_id: str, generation: str, event_id: str) -> str:
-        payload = {"p": production_id, "g": generation, "i": event_id}
-        raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+        return encode_cursor({"k": "event", "p": production_id, "g": generation, "i": event_id})
 
     def _decode_cursor(self, production_id: str, cursor: str) -> str:
         try:
-            padded = cursor + "=" * (-len(cursor) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
-            if not isinstance(payload, dict):
-                raise ValueError("cursor payload is not an object")
-            if payload.get("p") != production_id:
-                raise ValueError("cursor belongs to another production")
+            payload = decode_cursor(cursor)
+            if payload.get("k") != "event" or payload.get("p") != production_id:
+                raise ValueError("cursor belongs to another production or stream")
             event_id = str(payload["i"])
             generation = str(payload["g"])
         except (ValueError, KeyError, TypeError) as error:
@@ -58,9 +69,9 @@ class EventService:
     # -- projections -------------------------------------------------------
 
     def _reconcile(self, production_id: str) -> None:
-        # get_production validates scope and existence before any projection.
-        self.read_models.get_production(production_id)
-        self.store.insert_events(self.read_models.list_events(production_id))
+        # Scope/existence is validated by the selected read model first.
+        models = self._models_for(production_id)
+        self.store.insert_events(models.list_events(production_id))
 
     def snapshot_cursor(self, production_id: str) -> str:
         self._reconcile(production_id)

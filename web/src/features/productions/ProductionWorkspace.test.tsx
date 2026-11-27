@@ -2,6 +2,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { API_PREFIX } from "../../api/types";
 import { App } from "../../app/App";
 import { Providers } from "../../app/providers";
 import { routes } from "../../app/router";
@@ -144,6 +146,88 @@ describe("ProductionWorkspace", () => {
 
     const button = await screen.findByRole("button", { name: "Retomar" });
     await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it("atualiza o snapshot quando um evento nomeado chega", async () => {
+    renderWorkspace();
+    expect(await screen.findByText("Produção real")).toBeInTheDocument();
+
+    setCurrentProduction({
+      id: "d".repeat(32),
+      mode: "legacy",
+      title: "Produção atualizada",
+      topic: "Tema",
+      profile_id: "canal-a",
+      profile_revision: null,
+      snapshot_id: null,
+      state: "completed",
+      observed_stages: ["research"],
+      stages: [],
+      artifacts: [],
+      capabilities: [],
+      problems: [],
+      started_at: null,
+      updated_at: "2026-11-26T00:00:00+00:00",
+      cursor: null,
+    });
+    act(() => {
+      FakeEventSource.instances[0]?.emit("stage.completed", "{}", "evt-2");
+    });
+
+    expect(await screen.findByText("Produção atualizada")).toBeInTheDocument();
+  });
+
+  it("mostra entregas reais de todas as etapas na mesma jornada", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await screen.findByText("2 de 6 etapas concluídas");
+
+    expect(await screen.findByText("Afirmação sustentada")).toBeInTheDocument();
+    expect(screen.getByText("trecho real")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Roteiro/ }));
+    expect(await screen.findByText("Fala canônica")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Narração/ }));
+    expect(await screen.findByText(/Duração medida: 2s/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Mídia/ }));
+    expect(await screen.findByText(/CC-BY/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Edição/ }));
+    expect(await screen.findByText(/projeto.fcproj/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Revisão/ }));
+    expect(await screen.findByText(/duração: passou/)).toBeInTheDocument();
+  });
+
+  it("executa ação de retomada e atualiza a consulta da produção", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    const button = await screen.findByRole("button", { name: "Retomar" });
+    await user.click(button);
+    await waitFor(() => expect(button).toBeInTheDocument());
+  });
+
+  it("reusa a mesma chave em dois cliques rápidos de retomada", async () => {
+    const keys: (string | null)[] = [];
+    server.use(
+      http.post(`${API_PREFIX}/productions/:id/actions`, ({ request }) => {
+        keys.push(request.headers.get("Idempotency-Key"));
+        return HttpResponse.json({
+          job_id: "job-1", production_id: "p".repeat(32), status: "queued",
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace();
+    const button = await screen.findByRole("button", { name: "Retomar" });
+
+    await Promise.all([user.click(button), user.click(button)]);
+    await waitFor(() => expect(keys.length).toBeGreaterThan(0));
+
+    expect(keys[0]).toBeTruthy();
+    expect(new Set(keys).size).toBe(1);
   });
 
   it("não mistura eventos de outra produção", async () => {

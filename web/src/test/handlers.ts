@@ -40,6 +40,7 @@ export const profiles: ProfileView[] = [
   {
     id: "canal-a",
     name: "Canal A",
+    language: "pt-BR",
     niche: "astronomia",
     revision: 1,
     explicit_fields: ["language"],
@@ -50,6 +51,7 @@ export const profiles: ProfileView[] = [
   {
     id: "canal-b",
     name: "Canal B",
+    language: "en-US",
     niche: "geologia",
     revision: 2,
     explicit_fields: [],
@@ -118,6 +120,39 @@ export const handlers = [
   }),
   http.get(`${BASE}/productions/:id`, () =>
     HttpResponse.json(currentProduction),
+  ),
+  http.get(`${BASE}/productions/:id/stages/:stage/bundle`, ({ params }) => {
+    const stage = String(params.stage);
+    const bundles: Record<string, Record<string, unknown>> = {
+      research: {
+        claims: [{ claim_id: "c1", text: "Afirmação sustentada", evidence: [{ quote: "trecho real" }] }],
+        contradictions: [{ nature: "fonte divergente" }],
+      },
+      script: {
+        scenes: [{ scene_id: "s1", narration_text: "Fala canônica", shots: [{ shot_id: "sh1", visual: "plano real", claim_refs: ["c1"] }] }],
+      },
+      narration: {
+        voice: "voz-real",
+        segments: [{ segment_id: "n1", text: "Fala canônica", duration_seconds: 2, audio: { path: "audio/n1.wav" } }],
+      },
+      media: {
+        candidates: [{ candidate_id: "m1", license: "CC-BY", attribution: "Autor", url: "https://example.test" }],
+        selected: [{ shot_id: "sh1", candidate_id: "m1", file: { path: "media/sh1.mp4" } }],
+      },
+      editing: {
+        project_path: "projeto.fcproj",
+        previews: [{ path: "preview.mp4" }],
+        observed_state: { offline_media: [] },
+      },
+      review: {
+        checks: [{ name: "duração", passed: true, detail: "medida" }],
+        failures: [],
+      },
+    };
+    return HttpResponse.json(bundles[stage] ?? {});
+  }),
+  http.post(`${BASE}/productions/:id/actions`, () =>
+    HttpResponse.json({ job_id: "job-1", production_id: "p".repeat(32), status: "queued" }),
   ),
   http.get(`${BASE}/productions/:id/events`, () =>
     HttpResponse.json({

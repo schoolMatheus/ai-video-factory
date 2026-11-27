@@ -187,6 +187,18 @@ def get_tools() -> list[dict[str, object]]:
                 "note": "Teste de conexão disponível sob ação explícita.",
             }
         )
+    from ai_video_factory.integrations.tts import LocalTtsProvider
+
+    capabilities = LocalTtsProvider(Path.cwd() / "data").capabilities()
+    tools.append({
+        "id": "tts",
+        "state": "not_verified",
+        "note": (
+            f"idiomas declarados: {', '.join(capabilities.languages) or 'nenhum'}; "
+            f"vozes declaradas: {', '.join(capabilities.voices) or 'nenhuma'}. "
+            "Capacidade real só é confirmada ao sintetizar."
+        ),
+    })
     return tools
 
 

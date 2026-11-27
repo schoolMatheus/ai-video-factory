@@ -13,7 +13,8 @@ from typing import Callable, Mapping
 from uuid import uuid4
 
 from ai_video_factory.profiles.context import build_memory_context, stage_settings_digest
-from ai_video_factory.profiles.models import Observation, StageName
+from ai_video_factory.profiles.models import MemoryContext, Observation, StageName
+from ai_video_factory.models import StageStatus
 from ai_video_factory.profiles.store import ProfileStore
 from ai_video_factory.run_store import RunStore
 from ai_video_factory.workflow.contracts import StageContext, StageRunner
@@ -85,6 +86,8 @@ def run_production(
     run_store: RunStore | None = None,
     learning_reviewer: Callable | None = None,
     candidate_evaluator: object | None = None,
+    control: object | None = None,
+    invalidation_inputs: set[str] | None = None,
 ) -> ProductionResult:
     """Run the stages up to ``through``, reusing valid deliveries on resume."""
     if through not in STAGE_ORDER:
@@ -120,6 +123,19 @@ def run_production(
 
     _reconcile(state_dir, runs, store, resolved)
 
+    if invalidation_inputs:
+        affected = set(plan_invalidation(invalidation_inputs))
+        for stage in affected:
+            run_id = _load_json(run_ids_path).get(stage)
+            if run_id:
+                try:
+                    runs.invalidate_run(str(run_id), f"retrabalho: {sorted(invalidation_inputs)}")
+                except ValueError:
+                    pass
+            (state_dir / f"{stage}_result.json").unlink(missing_ok=True)
+            refs.pop(stage, None)
+        _write_json(refs_path, {name: ref.model_dump() for name, ref in refs.items()})
+
     if dry_run:
         return ProductionResult(
             production_id=resolved.production_id,
@@ -135,13 +151,34 @@ def run_production(
     for stage in STAGE_ORDER:
         if STAGE_ORDER.index(stage) > STAGE_ORDER.index(through):
             break
+        if _stop_requested(control):
+            # Cooperative stop at a stage boundary: the delivery already
+            # persisted stays valid, and no external command is killed.
+            return ProductionResult(
+                production_id=resolved.production_id,
+                profile_id=resolved.profile_id,
+                status="pending",
+                final_stage=stage,
+                project_dir=str(project_dir),
+                artifacts=all_artifacts,
+            )
         runner = runners.get(stage)
         if runner is None:
             raise StageExecutionError(f"no runner configured for stage {stage}")
-        memory = build_memory_context(
-            store, snapshot, stage, resolved.topic,
-            exclude_production_id=resolved.production_id,
-        )
+        # The applicable memory context is fixed on first execution of this
+        # production. Later observations or profile revisions must not change
+        # the fingerprint of work already delivered.
+        memory_path = state_dir / f"memory_{stage}.json"
+        if resume and memory_path.is_file():
+            memory = MemoryContext.model_validate(
+                json.loads(memory_path.read_text(encoding="utf-8"))
+            )
+        else:
+            memory = build_memory_context(
+                store, snapshot, stage, resolved.topic,
+                exclude_production_id=resolved.production_id,
+            )
+            memory_path.write_text(memory.model_dump_json(indent=2), encoding="utf-8")
         artifact_dir = artifacts_root / f"{STAGE_ORDER.index(stage) + 1:02d}_{stage}"
         artifact_dir.mkdir(parents=True, exist_ok=True)
         context = StageContext(
@@ -163,7 +200,6 @@ def run_production(
             "target_minutes": resolved.target_minutes,
             "seed_source_urls": list(resolved.seed_source_urls),
             "profile_id": resolved.profile_id,
-            "profile_revision": snapshot.revision,
             "stage_settings_digest": stage_settings_digest(snapshot, stage),
             "memory_digest": memory.digest,
             "tools": resolved.tools,
@@ -201,6 +237,13 @@ def run_production(
                 )
                 return _failed_result(resolved, stage, results, all_artifacts, failure)
             external_calls += 1
+            _write_json(state_dir / "budget_usage.json", {
+                "production_id": resolved.production_id,
+                "external_calls": external_calls,
+                "max_external_calls": budget.max_external_calls,
+                "attempt": context.attempt,
+                "trials": len(learning_ids),
+            })
 
         manifest = runs.start(stage, inputs_payload)
         run_ids = _load_json(run_ids_path)
@@ -221,24 +264,54 @@ def run_production(
                   "evidence_refs": [], "event_key": f"{resolved.production_id}:{stage}:failed"}],
                 context.effective_settings, context.tool_versions,
             )
+            if learning_reviewer is not None and not dry_run:
+                _apply_learning(
+                    store, context, stage, resolved.production_id,
+                    learning_reviewer, candidate_evaluator,
+                )
             return _failed_result(resolved, stage, results, all_artifacts, failure)
 
-        expected = {
-            key: ref.resolve(project_dir) for key, ref in result.artifacts.items()
-        }
-        if "bundle" not in expected:
-            raise StageExecutionError(f"stage {stage} did not declare a bundle artifact")
-        runs.complete(manifest.run_id, {key: str(path) for key, path in expected.items()},
-                      expected_artifacts=expected)
-        _record_observations(
-            store, resolved, stage, manifest.run_id,
-            [seed.model_dump() for seed in result.observations],
-            context.effective_settings, context.tool_versions,
-        )
-        result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        # Persistence and integrity checks happen after the runner returns. A
+        # failure here must become a structured production result, never an
+        # unhandled exception that hides what the stage actually delivered.
+        try:
+            expected = {
+                key: ref.resolve(project_dir) for key, ref in result.artifacts.items()
+            }
+            if "bundle" not in expected:
+                raise StageExecutionError(f"stage {stage} did not declare a bundle artifact")
+            runs.complete(manifest.run_id, {key: str(path) for key, path in expected.items()},
+                          expected_artifacts=expected)
+            _record_observations(
+                store, resolved, stage, manifest.run_id,
+                [seed.model_dump() for seed in result.observations],
+                context.effective_settings, context.tool_versions,
+            )
+            result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        except Exception as error:  # noqa: BLE001 - boundary: persist, then report
+            failure = StructuredError(
+                code=type(error).__name__, message=str(error),
+                details={"stage": stage, "phase": "after_runner"},
+            )
+            if runs._load_run(manifest.run_id).status is StageStatus.running:
+                runs.fail(manifest.run_id, failure.message)
+            return _failed_result(resolved, stage, results, all_artifacts, failure)
+
         results[stage] = result
         for key, ref in result.artifacts.items():
             all_artifacts[f"{stage}.{key}"] = ref
+
+        if result.status != "completed":
+            failure = result.error or StructuredError(
+                code="stage_rejected",
+                message=f"stage {stage} ended with status {result.status}",
+                details={"stage": stage},
+            )
+            # The bundle and diagnostics are already persisted with integrity;
+            # mark the run failed so resume cannot reuse a rejected delivery.
+            runs.invalidate_completed(manifest.run_id, inputs_payload, failure.message)
+            return _failed_result(resolved, stage, results, all_artifacts, failure)
+
         refs[stage] = result.artifacts["bundle"]
         _write_json(refs_path, {name: ref.model_dump() for name, ref in refs.items()})
 
@@ -250,8 +323,14 @@ def run_production(
                 )
             )
 
+        if control is not None and hasattr(control, "checkpoint"):
+            # A requested stop is confirmed here, at a persisted safe point.
+            control.checkpoint(stage)
+
     review = results.get("review")
-    package_path = review.artifacts.get("package") if review else None
+    package_ref = review.artifacts.get("package") if review else None
+    # The registered artifact is the manifest; the deliverable is its directory.
+    package_dir = package_ref.resolve(project_dir).parent if package_ref else None
     return ProductionResult(
         production_id=resolved.production_id,
         profile_id=resolved.profile_id,
@@ -259,9 +338,19 @@ def run_production(
         final_stage=through,
         project_dir=str(project_dir),
         artifacts=all_artifacts,
-        package_path=str(package_path.resolve(project_dir)) if package_path else None,
+        package_path=str(package_dir) if package_dir else None,
         learning_revision_ids=learning_ids,
     )
+
+
+def _stop_requested(control: object | None) -> bool:
+    """Read a cooperative stop signal; a cleared worker token means stopped."""
+    if control is None or not hasattr(control, "stop_requested"):
+        return False
+    try:
+        return bool(control.stop_requested())
+    except PermissionError:
+        return True
 
 
 def _predecessors(stage: StageName) -> tuple[StageName, ...]:

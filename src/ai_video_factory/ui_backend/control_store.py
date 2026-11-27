@@ -60,6 +60,15 @@ class ControlStore:
                     confirmed INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS staged_productions (
+                    production_id TEXT PRIMARY KEY,
+                    profile_id TEXT,
+                    topic TEXT,
+                    job_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id TEXT PRIMARY KEY,
                     production_id TEXT,
@@ -82,6 +91,18 @@ class ControlStore:
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
             }
+            staged_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(staged_productions)").fetchall()
+            }
+            for name, declaration in (
+                ("request_json", "TEXT"),
+                ("profile_revision", "INTEGER"),
+            ):
+                if name not in staged_columns:
+                    connection.execute(
+                        f"ALTER TABLE staged_productions ADD COLUMN {name} {declaration}"
+                    )
             for name, declaration in (
                 ("payload", "TEXT NOT NULL DEFAULT '{}'"),
                 ("worker_token", "TEXT"),
@@ -128,6 +149,76 @@ class ControlStore:
                 """,
                 job,
             )
+
+    def submit_transaction(
+        self,
+        key: str,
+        job: dict[str, object],
+        production: dict[str, object],
+        now: str,
+    ) -> bool:
+        """Persist idempotency, job and production identity in one transaction.
+
+        The receipt is only returned after this commits, so a query for the
+        job or the production can never hit a 404 created by our own submit.
+        """
+        job_id = str(job["job_id"])
+        production = {
+            "request_json": None,
+            "profile_revision": None,
+            **production,
+        }
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = connection.execute(
+                    "INSERT OR IGNORE INTO idempotency_keys (key, job_id, created_at) VALUES (?, ?, ?)",
+                    (key, job_id, now),
+                )
+                if cursor.rowcount != 1:
+                    connection.rollback()
+                    return False
+                connection.execute(
+                    """INSERT INTO jobs (
+                        job_id, production_id, status, idempotency_key, payload,
+                        worker_token, pid, heartbeat_at, result_reference,
+                        stop_requested, progress, problem, created_at, updated_at
+                    ) VALUES (
+                        :job_id, :production_id, :status, :idempotency_key, :payload,
+                        :worker_token, :pid, :heartbeat_at, :result_reference,
+                        :stop_requested, :progress, :problem, :created_at, :updated_at
+                    )""",
+                    job,
+                )
+                connection.execute(
+                    """INSERT OR REPLACE INTO staged_productions (
+                        production_id, profile_id, topic, job_id, status, created_at,
+                        updated_at, request_json, profile_revision
+                    ) VALUES (
+                        :production_id, :profile_id, :topic, :job_id, :status,
+                        :created_at, :updated_at, :request_json, :profile_revision
+                    )""",
+                    production,
+                )
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+
+    def staged_production(self, production_id: str) -> dict[str, object] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM staged_productions WHERE production_id = ?", (production_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def all_staged_productions(self) -> list[dict[str, object]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM staged_productions ORDER BY created_at, production_id"
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def job(self, job_id: str) -> dict[str, object] | None:
         with self._connect() as connection:
@@ -208,6 +299,16 @@ class ControlStore:
             except Exception:
                 connection.rollback()
                 raise
+
+    def next_queued_job_id(self) -> str | None:
+        """Read the next queued id without claiming it; workers claim atomically."""
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT job_id FROM jobs
+                   WHERE status = 'queued' AND worker_token IS NULL
+                   ORDER BY created_at, job_id LIMIT 1"""
+            ).fetchone()
+        return str(row["job_id"]) if row else None
 
     def all_jobs(self) -> list[dict[str, object]]:
         with self._connect() as connection:

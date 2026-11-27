@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, createProfile, reviseProfile } from "../../api/client";
 import type { ProfileView } from "../../api/types";
 import { Button } from "../../components/Button";
@@ -7,27 +7,45 @@ import styles from "./ProfileForm.module.css";
 
 const GROUPS = ["Identidade", "Pesquisa", "Roteiro", "Voz", "Mídia", "Edição", "Revisão"];
 
-export function ProfileForm({ profile }: { profile?: ProfileView }) {
+export function ProfileForm({
+  profile,
+  onSaved,
+}: {
+  profile?: ProfileView;
+  onSaved?: () => void;
+}) {
   const [name, setName] = useState(profile?.name ?? "");
   const [niche, setNiche] = useState(profile?.niche ?? "");
-  const [language, setLanguage] = useState("pt-BR");
+  const [language, setLanguage] = useState(profile?.language ?? "pt-BR");
   const [settings, setSettings] = useState(
     JSON.stringify(profile?.settings ?? {}, null, 2),
   );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<ProfileView | null>(null);
 
+  // Switching cached profiles must replace every field, not keep stale state.
+  useEffect(() => {
+    setName(profile?.name ?? "");
+    setNiche(profile?.niche ?? "");
+    setLanguage(profile?.language ?? "pt-BR");
+    setSettings(JSON.stringify(profile?.settings ?? {}, null, 2));
+    setSaved(null);
+  }, [profile?.id, profile?.revision]);
+
   async function save() {
     setError(null);
     try {
       if (profile) {
-        setSaved(
-          await reviseProfile(profile.id, {
-            expected_revision: profile.revision,
-            reason: "Alteração pelo painel local",
-            settings: JSON.parse(settings) as Record<string, unknown>,
-          }),
-        );
+        const revised = await reviseProfile(profile.id, {
+          expected_revision: profile.revision,
+          reason: "Alteração pelo painel local",
+          name,
+          language,
+          niche,
+          settings: JSON.parse(settings) as Record<string, unknown>,
+        });
+        setSaved(revised);
+        onSaved?.();
       } else {
         setSaved(
           await createProfile({
@@ -37,6 +55,7 @@ export function ProfileForm({ profile }: { profile?: ProfileView }) {
             niche,
           }),
         );
+        onSaved?.();
       }
     } catch (cause) {
       setError(

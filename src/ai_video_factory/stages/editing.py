@@ -63,6 +63,21 @@ class EditingStage:
         plan.save(plan_path)
         commands = self._commands(capabilities.commands)
 
+        # Open (or create) this production's project before inspecting it.
+        # Reusing an arbitrary open project would let one episode inherit
+        # another episode's clips.
+        project_path = str(artifacts_dir / f"{context.request.production_id}.fcproj")
+        project_command = commands.get("open") or commands.get("create")
+        if project_command is not None:
+            project_result = self.client.execute(project_command, {
+                "project_path": project_path,
+                "production_id": context.request.production_id,
+                "profile_id": context.request.profile_id,
+            })
+            self._log(artifacts_dir / "operations.jsonl", project_command, {
+                "project_path": project_path,
+            }, project_result)
+
         previous_path = artifacts_dir / "previous_snapshot.json"
         previous = self._load_snapshot(previous_path)
         observed = self.client.inspect()
@@ -79,29 +94,50 @@ class EditingStage:
             ))
 
         log_path = artifacts_dir / "operations.jsonl"
+        existing = {str(item.get("identity")): item for item in observed.items if item.get("identity")}
+        legacy = {
+            str(item.get("shot_id")): item for item in observed.items
+            if not item.get("identity") and not item.get("media_digest") and not item.get("source")
+        }
         for track in plan.tracks:
-            if track.kind != "video":
-                continue
             for item in track.items:
-                if item.shot_id in item_map:
-                    continue  # reconciled from an observed project after a crash
+                identity = _item_identity(context, track.kind, item)
+                if identity in existing:
+                    # Same production, media digest, track and interval: reuse.
+                    item_map[item.shot_id] = str(existing[identity].get("item_id", item.item_id))
+                    continue
+                if item.shot_id in legacy:
+                    # An older checkpoint has no verifiable identity; keep its
+                    # item rather than duplicating a clip already seen.
+                    item_map[item.shot_id] = str(legacy[item.shot_id].get("item_id", item.item_id))
+                    continue
                 params = {
                     "shot_id": item.shot_id,
                     "scene_id": item.scene_id,
                     "item_id": item.item_id,
+                    "identity": identity,
+                    "production_id": context.request.production_id,
+                    "kind": track.kind,
+                    "track_id": track.track_id,
+                    "media_digest": item.media_ref.sha256 if item.media_ref else "strategy",
                     "start_ticks": item.start_ticks,
                     "duration_ticks": item.duration_ticks,
                     "source_in_ticks": item.source_in_ticks,
                     "overlap_ticks": item.overlap_ticks,
                     "timebase_ticks_per_second": plan.timebase_ticks_per_second,
                     "media_path": item.media_ref.path if item.media_ref else None,
+                    "text": item.text,
                 }
                 result = self.client.execute(commands.get("insert", "insert_item"), params)
                 self._log(log_path, commands.get("insert", "insert_item"), params, result)
                 if result.requires_inspection:
                     observed = self.client.inspect()
-                    item_map = self._item_map(observed)
-                    if item.shot_id in item_map:
+                    existing = {
+                        str(entry.get("identity")): entry
+                        for entry in observed.items if entry.get("identity")
+                    }
+                    if identity in existing:
+                        item_map[item.shot_id] = str(existing[identity].get("item_id", item.item_id))
                         continue
                     raise EditingStageError(
                         f"mutation for {item.shot_id} is indeterminate and was not observed; refusing blind retry"
@@ -109,6 +145,8 @@ class EditingStage:
                 if result.status == "rejected":
                     raise EditingStageError(self._error_text(result, commands["insert"]))
                 item_map[item.shot_id] = str(result.state.get("item_id", item.item_id))
+                existing[identity] = dict(result.state, identity=identity)
+                observed.items.append(dict(result.state, identity=identity))
 
         media_refs = [item.media_ref for item in plan.tracks[0].items if item.media_ref]
         media_refs += [item.media_ref for track in plan.tracks if track.kind == "narration" for item in track.items if item.media_ref]
@@ -132,6 +170,8 @@ class EditingStage:
             result = self.client.execute(command, params)
             self._log(log_path, command, params, result)
             warnings.extend(result.warnings)
+            if alias == "export" and result.job_id:
+                self._wait_export(commands, result.job_id, log_path)
             if result.requires_inspection:
                 observed = self.client.inspect()
             if result.status == "rejected":
@@ -178,9 +218,12 @@ class EditingStage:
     def _commands(available: list[str]) -> dict[str, str]:
         candidates = {
             "insert": ("insert_item", "insert_clip", "add_item"),
+            "open": ("open_project", "get_project", "project.open"),
+            "create": ("create_project", "project.create"),
             "save": ("save_project", "project.save"),
             "preview": ("render_preview", "preview"),
             "export": ("export_project", "export"),
+            "job": ("get_job", "job_status"),
             "inspect": ("inspect_project", "get_project"),
         }
         found: dict[str, str] = {}
@@ -215,11 +258,39 @@ class EditingStage:
         if result.status == "applied" and command in {"export_project", "export"}:
             self._last_export_state = dict(result.state)
 
+    def _wait_export(
+        self, commands: Mapping[str, str], job_id: str, log_path: Path
+    ) -> None:
+        """An asynchronous export is only complete when the job says so."""
+        command = commands.get("job")
+        if command is None:
+            raise EditingStageError(
+                f"export job {job_id} is asynchronous but no job-status command is available"
+            )
+        for _ in range(10):
+            result = self.client.execute(command, {"job_id": job_id})
+            self._log(log_path, command, {"job_id": job_id}, result)
+            if result.status == "rejected":
+                raise EditingStageError(self._error_text(result, command))
+            if str(result.state.get("status", "")).lower() in {"completed", "done", "succeeded"}:
+                self._last_export_state.update(result.state)
+                return
+        raise EditingStageError(f"export job {job_id} did not complete within the bounded wait")
+
     @staticmethod
     def _error_text(result: EditorCommandResult, command: str) -> str:
         if result.error is not None:
             return f"editor command {command} failed: {result.error.message}"
         return f"editor command {command} was not applied ({result.status})"
+
+
+def _item_identity(context: StageContext, kind: str, item: Any) -> str:
+    """Identity includes the episode, track, source digest and exact interval."""
+    digest = item.media_ref.sha256 if item.media_ref else "strategy"
+    return ":".join((
+        context.request.production_id, kind, item.shot_id, digest,
+        str(item.start_ticks), str(item.duration_ticks), str(item.source_in_ticks),
+    ))
 
 
 def _snapshot_digest(snapshot: EditorSnapshot) -> str:

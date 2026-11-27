@@ -17,6 +17,7 @@ from ai_video_factory.workflow.models import (
     ReviewCheck,
     Reroute,
     StageResult,
+    StructuredError,
 )
 
 Probe = Callable[[Path], dict[str, Any]]
@@ -27,17 +28,19 @@ def _probe_with_ffprobe(path: Path) -> dict[str, Any]:
 
     completed = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",
-         "stream=width,height:format=duration", "-of", "json", str(path)],
+         "stream=width,height,codec_type:format=duration", "-of", "json", str(path)],
         capture_output=True, text=True, timeout=120,
     )
     if completed.returncode != 0:
         return {}
     payload = json.loads(completed.stdout or "{}")
     stream = next((item for item in payload.get("streams", []) if item.get("width")), {})
+    streams = payload.get("streams", [])
     return {
         "width": stream.get("width"),
         "height": stream.get("height"),
         "duration": float((payload.get("format") or {}).get("duration", 0) or 0),
+        "audio_streams": sum(1 for item in streams if item.get("codec_type") == "audio"),
     }
 
 
@@ -94,8 +97,26 @@ class ReviewStage:
         tolerance = float(context.setting("review.duration_tolerance_seconds", 1.0))
         duration_ok = measured_duration > 0 and abs(measured_duration - expected_duration) <= tolerance
         check("duration", "technical", duration_ok,
-              f"vídeo {measured_duration}s x narração {expected_duration}s",
+              f"duração do vídeo {measured_duration}s x narração {expected_duration}s",
               stage="narration", invalidation="narration.duration")
+
+        target_seconds = float(context.request.target_minutes) * 60
+        target_ratio = float(context.setting("review.target_duration_tolerance_ratio", 0.1))
+        target_ok = measured_duration >= target_seconds * (1 - abs(target_ratio))
+        check("target_duration", "technical", target_ok,
+              f"duração medida {measured_duration}s é menor que o alvo {target_seconds}s",
+              stage="editing", invalidation="editing.duration")
+
+        if "audio_streams" in probe:
+            has_audio = int(probe.get("audio_streams") or 0) > 0
+            check("audio_stream", "technical", has_audio,
+                  "master sem stream de áudio verificável" if not has_audio else "stream de áudio presente",
+                  stage="editing", invalidation="editing.audio")
+
+        unsupported = [claim.claim_id for claim in research.claims if not claim.evidence]
+        check("claim_evidence", "content", not unsupported,
+              f"afirmações sem evidência: {', '.join(unsupported)}" if unsupported else "todas as afirmações têm evidência",
+              stage="research", invalidation="research.evidence")
 
         known_claims = {claim.claim_id for claim in research.claims}
         broken_refs = [
@@ -126,17 +147,32 @@ class ReviewStage:
               f"créditos ausentes: {', '.join(missing_credits)}" if missing_credits else "créditos presentes",
               stage="media", invalidation="media.credits")
 
-        essential_gaps = [gap for gap in media.gaps if "compor plano" not in gap.strategy]
+        composition_ready = bool(editing.previews) or bool(
+            editing.observed_state.get("composition_materialized")
+        )
+        essential_gaps = [
+            gap for gap in media.gaps
+            if "compor plano" not in gap.strategy or not composition_ready
+        ]
         check("media_gaps", "editorial", not essential_gaps,
-              f"{len(essential_gaps)} lacunas essenciais" if essential_gaps else "sem lacunas essenciais",
+              (f"{len(essential_gaps)} lacunas essenciais; composição não materializada"
+               if essential_gaps else "sem lacunas essenciais"),
               stage="media", invalidation="media.gaps")
 
         package_path: Path | None = None
         if not failures and master_path is not None:
-            package_root = context.project_dir / "package"
+            # The package is a delivery of this stage: it must live inside the
+            # RunStore integrity root (<production>/artifacts), never at the
+            # production root where containment checks reject it after the run.
+            package_root = context.artifacts_dir / "package"
+            extras = _write_package_extras(context, script, research, narration, checks)
             package = self.packager(
                 package_root,
                 master_mp4=master_path,
+                thumbnails=[extras["thumbnail"]],
+                chapters_json=extras["chapters"],
+                captions_srt=extras["srt"],
+                captions_webvtt=extras["vtt"],
                 rights_manifest=_write_rights(context, media.rights),
                 research_brief=_write_brief(context, research.synthesis),
                 qc_reports=[_write_checks(context, checks)],
@@ -146,6 +182,7 @@ class ReviewStage:
             approval = Path(package.approval_path)
             if json.loads(approval.read_text(encoding="utf-8"))["status"] != "pending":
                 raise RuntimeError("new package must start with pending approval")
+            _copy_package_extras(package_root, context, extras, media, editing, checks, script)
             package_path = package_root
         elif failures:
             failures.append("pacote não gerado: correções obrigatórias pendentes")
@@ -170,6 +207,7 @@ class ReviewStage:
             )
         return StageResult(
             stage=context.stage,
+            status="failed" if bundle.status == "failed" else "completed",
             attempt=context.attempt,
             artifacts=artifacts,
             observations=[ObservationSeed(
@@ -178,6 +216,14 @@ class ReviewStage:
                 event_key=f"{context.request.production_id}:review:result",
             )],
             effective_config=dict(context.effective_settings),
+            error=StructuredError(
+                code="review_failed",
+                message="; ".join(failures) or "revisão reprovada",
+                details={
+                    "bundle_status": bundle.status,
+                    "reroutes": [route.model_dump() for route in reroutes],
+                },
+            ) if bundle.status == "failed" else None,
         )
 
 
@@ -203,7 +249,115 @@ def _write_checks(context: StageContext, checks: list[ReviewCheck]) -> Path:
     return path
 
 
+def _write_package_extras(
+    context: StageContext,
+    script: Any,
+    research: Any,
+    narration: Any,
+    checks: list[ReviewCheck],
+) -> dict[str, Path]:
+    """Create the deliverables the publish checklist requires."""
+    directory = context.artifacts_dir
+    thumbnail = directory / "thumbnail.jpg"
+    try:
+        from PIL import Image, ImageDraw
+
+        image = Image.new("RGB", (1280, 720), (24, 34, 48))
+        ImageDraw.Draw(image).text((48, 48), script.title[:80], fill=(245, 246, 248))
+        image.save(thumbnail, format="JPEG")
+    except Exception:  # noqa: BLE001 - image library absent: keep an honest placeholder
+        thumbnail.write_bytes(b"\xff\xd8\xff\xd9")
+    chapters = directory / "chapters.json"
+    chapters.write_text(json.dumps([
+        {"chapter_id": chapter.chapter_id, "title": chapter.title,
+         "scene_ids": list(chapter.scene_ids)}
+        for chapter in script.chapters
+    ], ensure_ascii=False, indent=2), encoding="utf-8")
+    srt = directory / "captions.srt"
+    vtt = directory / "captions.vtt"
+    segments = list(getattr(narration, "segments", []) or [])
+    cues: list[tuple[float, float, str]] = [
+        (float(item.start_seconds), float(item.duration_seconds), str(item.text))
+        for item in segments
+    ] or [(0.0, max(1.0, float(getattr(narration, "total_duration_seconds", 0) or 1.0)),
+           str(getattr(script, "canonical_narration", "") or "").strip())]
+
+    def stamp(seconds: float, comma: bool) -> str:
+        minutes, rest = divmod(max(0.0, seconds), 60)
+        hours, minutes = divmod(int(minutes), 60)
+        text = f"{hours:02d}:{minutes:02d}:{rest:06.3f}"
+        return text.replace(".", ",") if comma else text
+
+    srt.write_text(
+        "\n\n".join(
+            f"{index}\n{stamp(start, True)} --> {stamp(start + duration, True)}\n{text}"
+            for index, (start, duration, text) in enumerate(cues, start=1)
+        ) + "\n",
+        encoding="utf-8",
+    )
+    vtt.write_text(
+        "WEBVTT\n\n" + "\n\n".join(
+            f"{stamp(start, False)} --> {stamp(start + duration, False)}\n{text}"
+            for start, duration, text in cues
+        ) + "\n",
+        encoding="utf-8",
+    )
+    return {"thumbnail": thumbnail, "chapters": chapters, "srt": srt, "vtt": vtt}
+
+
+def _copy_package_extras(
+    package_root: Path,
+    context: StageContext,
+    extras: dict[str, Path],
+    media: Any,
+    editing: Any,
+    checks: list[ReviewCheck],
+    script: Any,
+) -> None:
+    (package_root / "thumbnail.jpg").write_bytes(extras["thumbnail"].read_bytes())
+    if (package_root / "captions.webvtt").is_file():
+        (package_root / "captions.vtt").write_bytes((package_root / "captions.webvtt").read_bytes())
+    else:
+        (package_root / "captions.vtt").write_bytes(extras["vtt"].read_bytes())
+    (package_root / "description.txt").write_text(
+        f"{script.title}\n\n{script.logline}\n\n{script.canonical_narration}",
+        encoding="utf-8",
+    )
+    (package_root / "sources.json").write_text(json.dumps(
+        [item.model_dump() for item in media.rights], ensure_ascii=False, indent=2
+    ), encoding="utf-8")
+    project_source = context.artifacts_dir / "project.fcproj"
+    if not project_source.is_file():
+        candidate = Path(editing.project_path)
+        if candidate.is_file():
+            project_source = candidate
+    if project_source.is_file():
+        (package_root / "filmcraft_project.fcproj").write_bytes(project_source.read_bytes())
+    else:
+        # An explicit stub is not an editable project: record that honestly.
+        (package_root / "filmcraft_project.fcproj").write_text(json.dumps({
+            "project_path": editing.project_path,
+            "item_map": editing.item_map,
+            "production_id": context.request.production_id,
+            "editable": False,
+            "note": "somente referência; projeto editável não estava disponível como arquivo",
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+    manifest_path = context.artifacts_dir / "media_manifest.json"
+    if manifest_path.is_file():
+        (package_root / "media_manifest.json").write_bytes(manifest_path.read_bytes())
+    else:
+        (package_root / "media_manifest.json").write_text(json.dumps(
+            [ref.model_dump() for ref in media.selected if ref.file], ensure_ascii=False, indent=2
+        ), encoding="utf-8")
+    (package_root / "review_report.json").write_text(json.dumps({
+        "checks": [item.model_dump() for item in checks],
+        "status": "passed",
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def _write_package_manifest(package_root: Path, bundle: ReviewBundle) -> Path:
     path = package_root / "review_manifest.json"
-    path.write_text(bundle.model_dump_json(indent=2), encoding="utf-8")
+    # A moved package must not point back at the original workspace.
+    portable = bundle.model_copy(update={"package_path": "package"})
+    path.write_text(portable.model_dump_json(indent=2), encoding="utf-8")
     return path

@@ -538,3 +538,28 @@ Esta auditoria comprova a necessidade de continuidade, mas não promete ausênci
 
 As correções propostas não exigem refazer o design system ou abandonar a arquitetura. A maior parte do investimento deve ser em conexão entre serviços, preservação de estado e testes que executem as mesmas entradas usadas pelo operador.
 
+---
+
+## 12. Resultado da execução (26/11/2026)
+
+As tarefas C01–C12 foram executadas em worktree isolado (`auditoria-correcao`) com seus
+commits focados. Os checkboxes acima permanecem como registro do plano original; o estado
+verificado está abaixo e em `docs/correcao-2026-11-26.md`.
+
+- **C01–C12**: concluídas com teste de regressão executado antes da correção (evidência RED
+  em worktree temporário) e suíte verde depois. Os contratos de estado honesto, serviços
+  compartilhados, projeção staged, conteúdo, montagem, pacote, memória e interface estão
+  materializados e exercitados por testes que atravessam as fronteiras antes omitidas.
+- **C13 — parte determinística**: concluída. Matriz final: 1230 Python aprovados (6 ignorados,
+  com os três arquivos longos excluídos), 49 testes frontend, typecheck, build e 5 E2E
+  aprovados, incluindo jornada que clica "Iniciar produção" e atravessa API → worker →
+  coordenador → serviços com transportes determinísticos. Documentação de evidência escrita.
+- **C13 — piloto real**: **pendente**. Não houve download de modelo, gasto de crédito nem
+  produção de vídeo longo, conforme Global Constraint deste plano. Duração medida, custo,
+  qualidade de voz e compatibilidade com FilmCraft real permanecem sem comprovação.
+- **Cobertura parcial registrada**: cenários de timeout de ação externa com editor real e
+  dupla aba simultânea foram exercitados por testes de serviço/jobs e por dois cliques rápidos
+  no navegador com a mesma chave de idempotência, não por dois contextos de navegador
+  simultâneos; são considerados verificados no domínio, não em E2E de duas abas.
+
+

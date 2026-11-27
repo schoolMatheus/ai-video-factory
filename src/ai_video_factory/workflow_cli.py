@@ -69,19 +69,22 @@ def _stock_runners(data_root: Path) -> MediaStage:
 
 
 def build_runners(store: Any, snapshot: Any, data_root: Path) -> dict[StageName, Any]:
-    """Default runner map; tests replace this boundary with deterministic runners."""
+    """Default runner map; tests replace this boundary with deterministic runners.
+
+    The CLI and the UI worker use the same composition root in
+    ``workflow.services``; only the transports differ.
+    """
+    from ai_video_factory.workflow.services import build_production_services
+
     config = load_filmcraft_config(Path("config") / "filmcraft.toml")
     filmcraft = FilmCraftMcpClient(config) if config is not None else _UnconfiguredFilmCraft()
-    editing = EditingStage(filmcraft)
-    narration_languages = tuple(snapshot.settings.get("narration.languages", ("en",)))
-    return {
-        "research": ResearchStage(),
-        "script": ScriptStage(),
-        "narration": NarrationStage(),
-        "media": _stock_runners(data_root),
-        "editing": editing,
-        "review": ReviewStage(),
-    }
+    services = build_production_services(
+        snapshot,
+        {"data_root": data_root},
+        {"editor": filmcraft},
+        store=store,
+    )
+    return dict(services.runners)
 
 
 def _request(
@@ -92,6 +95,7 @@ def _request(
     production: str | None,
     base_dir: str | None,
     budget_calls: int | None,
+    seed_source_urls: list[str] | None = None,
 ) -> ProductionRequest:
     payload: dict[str, Any] = {
         "production_id": production or f"production-{os.getpid()}",
@@ -99,7 +103,7 @@ def _request(
         "topic": topic,
         "angle": angle,
         "target_minutes": target_minutes,
-        "seed_source_urls": [],
+        "seed_source_urls": list(seed_source_urls or []),
         "base_dir": base_dir or str(data_dir() / "projects"),
     }
     if budget_calls is not None:
@@ -112,19 +116,23 @@ def run(
     profile: str = typer.Option(..., "--profile", help="Explicit channel profile id (never inferred)"),
     topic: str = typer.Option(..., "--topic", help="Topic supplied by the operator"),
     angle: str = typer.Option("", "--angle", help="Editorial angle"),
-    target_minutes: float = typer.Option(25.0, "--target-minutes", min=1.0),
+    target_minutes: float = typer.Option(25.0, "--target-minutes", min=0.01),
     through: str = typer.Option("review", "--through", help="Last stage to execute"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan without external services or learning"),
     base_dir: str | None = typer.Option(None, "--base-dir", help="Production root override"),
     budget_calls: int | None = typer.Option(None, "--budget-calls", min=0),
     production: str | None = typer.Option(None, "--production", help="Explicit production id"),
+    seed_source_urls: list[str] = typer.Option(
+        [], "--seed-source-url", help="Initial source URL (repeatable; optional)",
+    ),
 ) -> None:
     """Start a staged production for one explicit profile."""
     if through not in STAGE_ORDER:
         raise typer.BadParameter(f"unknown stage: {through}")
     store = open_store()
     snapshot = store.get_snapshot(profile)
-    request = _request(profile, topic, angle, target_minutes, production, base_dir, budget_calls)
+    request = _request(profile, topic, angle, target_minutes, production, base_dir,
+                       budget_calls, seed_source_urls)
     runners = build_runners(store, snapshot, data_dir())
     result = run_production(
         request, store=store, runners=runners, through=through, dry_run=dry_run,

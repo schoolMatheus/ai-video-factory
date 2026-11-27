@@ -267,6 +267,13 @@ class RunStore:
             raise ValueError("only completed runs can be invalidated")
         return self._invalidate(manifest, sanitize_diagnostic(error))
 
+    def invalidate_run(self, run_id: str, reason: str) -> RunManifest:
+        """Invalidate a completed run for an explicit rework decision."""
+        manifest = self._load_run(run_id)
+        if manifest.status is not StageStatus.completed:
+            raise ValueError("only completed runs can be invalidated")
+        return self._invalidate(manifest, reason)
+
     def _newest_completed(self, stage: str, fingerprint: str) -> RunManifest | None:
         self._validate_stage(stage)
         stage_directory = self.root / stage

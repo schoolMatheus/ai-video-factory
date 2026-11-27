@@ -6,15 +6,17 @@ JSONL lines are surfaced as unknown data, never as completed work.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from ai_video_factory.models import ArtifactIntegrity, RunManifest, StageStatus
+from ai_video_factory.run_store import RunStore
+from ai_video_factory.workflow.models import STAGE_ORDER, ArtifactRef
 from ai_video_factory.ui_backend.models import (
     ActionAvailability,
     ArtifactView,
@@ -79,21 +81,28 @@ def _sort_key(run: _ObservedRun) -> tuple[datetime, str]:
     return parsed, run.manifest.run_id
 
 
-def _encode_cursor(run_id: str) -> str:
-    payload = json.dumps({"id": run_id}, separators=(",", ":")).encode("utf-8")
-    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+def _page_key(run: _ObservedRun) -> tuple[str, str]:
+    """(updated_at, identity) matches the reverse sort used by the page."""
+    identity = str(run.manifest.inputs.get("production_id") or run.manifest.run_id)
+    return run.manifest.updated_at, identity
 
 
-def _decode_cursor(cursor: str) -> str:
+def _encode_cursor(key: tuple[str, str]) -> str:
+    from ai_video_factory.ui_backend.cursors import encode_cursor
+
+    return encode_cursor({"k": "page", "u": key[0], "p": key[1]})
+
+
+def _decode_cursor(cursor: str) -> tuple[str, str]:
+    from ai_video_factory.ui_backend.cursors import decode_cursor
+
     try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
-        run_id = payload["id"]
+        payload = decode_cursor(cursor)
+        if payload.get("k") != "page" or not isinstance(payload.get("u"), str):
+            raise ValueError("wrong cursor kind")
+        return str(payload["u"]), str(payload.get("p", ""))
     except (ValueError, KeyError, TypeError) as error:
         raise InvalidRequestError("Cursor de paginação inválido.") from error
-    if not isinstance(run_id, str) or _RUN_ID.fullmatch(run_id) is None:
-        raise InvalidRequestError("Cursor de paginação inválido.")
-    return run_id
 
 
 class ProductionReadModels:
@@ -153,7 +162,7 @@ class ProductionReadModels:
         after = _decode_cursor(cursor) if cursor else None
         runs = sorted(self._all_runs(), key=_sort_key, reverse=True)
         if after is not None:
-            runs = [run for run in runs if _sort_key(run) < _sort_key(self._find_run(after))]
+            runs = [run for run in runs if _page_key(run) < after]
         if filters.profile_id is not None:
             runs = [
                 run
@@ -177,7 +186,7 @@ class ProductionReadModels:
 
         page = runs[:page_size]
         items = [self._project(run) for run in page]
-        next_cursor = _encode_cursor(page[-1].manifest.run_id) if len(runs) > page_size else None
+        next_cursor = _encode_cursor(_page_key(page[-1])) if len(runs) > page_size else None
         return ProductionPage(items=items, next_cursor=next_cursor)
 
     def get_production(self, production_id: str) -> ProductionView:
@@ -381,3 +390,197 @@ def get_stage(
     models: ProductionReadModels, production_id: str, stage: StageName
 ) -> StageView:
     return models.get_stage(production_id, stage)
+
+
+class StagedProductionReadModels:
+    """Read-only view of one real coordinator production.
+
+    There is no run_id-as-production shortcut: the resource id is the
+    ProductionRequest id, and each of the six stages is projected from its
+    persisted StageResult and RunStore integrity record.
+    """
+
+    def __init__(self, project_root: Path) -> None:
+        self.root = Path(project_root)
+        self.state_root = self.root / "state"
+        self.artifact_root = (self.root / "artifacts").resolve()
+
+    def _json(self, path: Path) -> dict[str, Any]:
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def get_production(self, production_id: str) -> ProductionView:
+        request_path = self.root / "production.json"
+        snapshot_path = self.root / "profile_snapshot.json"
+        if not request_path.is_file() or not snapshot_path.is_file():
+            raise NotFoundError("Produção não encontrada.")
+        request = self._json(request_path)
+        if request.get("production_id") != production_id:
+            raise NotFoundError("Produção não encontrada.")
+        snapshot = self._json(snapshot_path)
+
+        state_dir = self.root / "state"
+        verified: dict[str, str] = {}
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        store = RunStore(state_dir, artifact_root=self.root / "artifacts")
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            try:
+                manifest = store._load_run(str(run_id))
+            except Exception:  # noqa: BLE001 - a damaged run is not verified
+                continue
+            for key, record in manifest.artifact_integrity.items():
+                verified[f"{stage}.{key}"] = record.path
+
+        stages: list[StageView] = []
+        artifacts: list[ArtifactView] = []
+        statuses: list[UiStageStatus] = []
+        for stage in STAGE_ORDER:
+            result_path = state_dir / f"{stage}_result.json"
+            if result_path.is_file():
+                result = self._json(result_path)
+                status = UiStageStatus(result.get("status", "completed"))
+                refs = result.get("artifacts", {})
+            else:
+                status = UiStageStatus.pending
+                refs = {}
+            stage_artifacts: list[ArtifactView] = []
+            for key, ref in refs.items():
+                name = Path(str(ref.get("path", key))).name
+                identity = f"{stage}.{key}"
+                stage_artifacts.append(ArtifactView(
+                    id=identity, name=name,
+                    media_type=str(ref.get("media_type", "application/octet-stream")),
+                    size_bytes=int(ref.get("size_bytes", 0) or 0),
+                    sha256=str(ref.get("sha256")) if ref.get("sha256") else None,
+                    integrity="verified" if identity in verified else "not_recorded",
+                    stage=StageName(stage),
+                ))
+            artifacts.extend(stage_artifacts)
+            statuses.append(status)
+            stages.append(StageView(
+                name=StageName(stage), status=status,
+                activity=f"{stage}: {status.value}", observed=result_path.is_file(),
+                artifacts=stage_artifacts,
+            ))
+
+        if UiStageStatus.failed in statuses:
+            overall = UiStageStatus.failed
+        elif all(status == UiStageStatus.completed for status in statuses):
+            overall = UiStageStatus.completed
+        elif UiStageStatus.running in statuses:
+            overall = UiStageStatus.running
+        else:
+            overall = UiStageStatus.pending
+
+        profile_id = str(snapshot.get("profile_id") or request.get("profile_id") or "")
+        revision = int(snapshot.get("revision") or 0)
+        return ProductionView(
+            id=production_id,
+            mode=ProductionMode.staged,
+            title=str(request.get("topic") or production_id),
+            topic=str(request.get("topic")) if request.get("topic") else None,
+            profile_id=profile_id or None,
+            profile_revision=revision or None,
+            snapshot_id=f"{profile_id}:r{revision}" if profile_id else None,
+            state=overall,
+            stages=stages,
+            artifacts=artifacts,
+            started_at=request.get("created_at"),
+            updated_at=str(snapshot.get("revision")) if revision else None,
+        )
+
+    def find_artifact(
+        self, artifact_id: str
+    ) -> tuple[str, str, ArtifactIntegrity] | None:
+        state_dir = self.root / "state"
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        store = RunStore(state_dir, artifact_root=self.artifact_root)
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            try:
+                manifest = store._load_run(str(run_id))
+            except Exception:  # noqa: BLE001 - damaged run is not an artifact
+                continue
+            for key, record in manifest.artifact_integrity.items():
+                if ProductionReadModels._artifact_id(manifest.run_id, key) == artifact_id:
+                    return manifest.run_id, key, record
+        return None
+
+    def list_artifacts(self, production_id: str) -> list[ArtifactView]:
+        state_dir = self.root / "state"
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        store = RunStore(state_dir, artifact_root=self.artifact_root)
+        artifacts: list[ArtifactView] = []
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            try:
+                manifest = store._load_run(str(run_id))
+            except Exception:  # noqa: BLE001
+                continue
+            for key, record in manifest.artifact_integrity.items():
+                artifacts.append(ArtifactView(
+                    id=ProductionReadModels._artifact_id(manifest.run_id, key),
+                    name=Path(record.path).name,
+                    media_type=_media_type(record.path),
+                    size_bytes=record.size_bytes,
+                    sha256=record.sha256,
+                    stage=StageName(stage),
+                    integrity="verified",
+                ))
+        return sorted(artifacts, key=lambda item: item.id)
+
+    def get_bundle(self, production_id: str, stage: str) -> dict[str, Any]:
+        """Return the persisted delivery bundle for one stage, when it exists."""
+        self.get_production(production_id)
+        state_dir = self.root / "state"
+        result_path = state_dir / f"{stage}_result.json"
+        if not result_path.is_file():
+            raise NotFoundError("Entrega de estágio ainda não disponível.")
+        result = self._json(result_path)
+        ref = result.get("artifacts", {}).get("bundle")
+        if ref is None:
+            raise NotFoundError("Bundle do estágio não registrado.")
+        path = ArtifactRef.model_validate(ref).resolve(self.root)
+        return self._json(path)
+
+    def list_events(self, production_id: str) -> list[EventView]:
+        """Project RunStore events as typed, replayable UI events."""
+        self.get_production(production_id)
+        state_dir = self.root / "state"
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        events: list[EventView] = []
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            path = state_dir / stage / str(run_id) / "events.jsonl"
+            if not path.is_file():
+                continue
+            for index, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    # An incomplete trailing line after a crash is ignored;
+                    # the file itself is never rewritten.
+                    continue
+                name = str(record.get("event", "run_event"))
+                events.append(EventView(
+                    id=f"{run_id}:{index}",
+                    production_id=production_id,
+                    type=f"stage.{name.removeprefix('run_')}",
+                    timestamp=str(record.get("timestamp")) if record.get("timestamp") else None,
+                    severity="error" if "fail" in name else "info",
+                    payload=dict(record.get("fields") or {}),
+                ))
+        return sorted(events, key=lambda item: (item.timestamp or "", item.id))
+

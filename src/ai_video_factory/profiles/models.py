@@ -112,6 +112,7 @@ class ProfileSnapshot(StrictModel):
     schema_version: Literal[1] = 1
     profile_id: str
     revision: int = Field(ge=1)
+    name: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
     explicit_fields: list[str] = Field(default_factory=list)
     active_learning_ids: list[str] = Field(default_factory=list)
@@ -128,6 +129,9 @@ class ProfileSnapshot(StrictModel):
 class ProfilePatch(StrictModel):
     """A typed, bounded profile change. Free-form text cannot become config."""
 
+    name: str = ""
+    language: str = ""
+    niche: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
     explicit_fields: list[str] = Field(default_factory=list)
     tool_versions: dict[str, str] = Field(default_factory=dict)
@@ -139,6 +143,9 @@ class ProfilePatch(StrictModel):
     def has_content(self) -> ProfilePatch:
         if not any(
             (
+                self.name,
+                self.language,
+                self.niche,
                 self.settings,
                 self.explicit_fields,
                 self.tool_versions,
@@ -248,6 +255,7 @@ def make_snapshot(spec: ProfileSpec, revision: int = 1, active_learning_ids: lis
     return ProfileSnapshot(
         profile_id=spec.profile_id,
         revision=revision,
+        name=spec.name,
         settings=dict(spec.settings),
         explicit_fields=list(spec.explicit_fields),
         active_learning_ids=active,
@@ -275,6 +283,7 @@ def apply_profile_patch(snapshot: ProfileSnapshot, patch: ProfilePatch, reason: 
     return ProfileSnapshot(
         profile_id=snapshot.profile_id,
         revision=revision,
+        name=patch.name or snapshot.name,
         settings=settings,
         explicit_fields=explicit,
         active_learning_ids=list(snapshot.active_learning_ids),
@@ -285,8 +294,8 @@ def apply_profile_patch(snapshot: ProfileSnapshot, patch: ProfilePatch, reason: 
             patch.operation_budget or snapshot.operation_budget,
             tool_versions,
         ),
-        language=snapshot.language,
-        niche=snapshot.niche,
+        language=patch.language or snapshot.language,
+        niche=patch.niche or snapshot.niche,
         tool_versions=tool_versions,
         review_policy=patch.review_policy or snapshot.review_policy,
         learning_policy=patch.learning_policy or snapshot.learning_policy,

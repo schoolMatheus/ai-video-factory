@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from ai_video_factory.ui_backend.control_store import ControlStore
 from ai_video_factory.ui_backend.models import InvalidRequestError, NotFoundError
@@ -42,10 +43,20 @@ class UploadRecord:
 
 
 class ArtifactService:
-    def __init__(self, read_models: ProductionReadModels, artifact_root: Path) -> None:
+    def __init__(
+        self,
+        read_models: ProductionReadModels,
+        artifact_root: Path,
+        *,
+        control_db: Path | None = None,
+        staged_factory: Any = None,
+    ) -> None:
         self.read_models = read_models
         self.artifact_root = Path(artifact_root).resolve()
-        self.store = ControlStore(read_models.state_root.parent / "data" / "ui" / "control.sqlite3")
+        self.staged_factory = staged_factory
+        self.store = ControlStore(
+            control_db or read_models.state_root.parent / "data" / "ui" / "control.sqlite3"
+        )
 
     @staticmethod
     def artifact_id(production_id: str, key: str) -> str:
@@ -55,16 +66,22 @@ class ArtifactService:
         self, artifact_id: str, *, production_id: str | None = None
     ) -> ResolvedArtifact:
         found = self.read_models.find_artifact(artifact_id)
+        root = self.artifact_root
+        if found is None and self.staged_factory is not None:
+            staged = self.staged_factory(artifact_id)
+            if staged is not None:
+                found = staged.find_artifact(artifact_id)
+                root = staged.artifact_root
         if found is None:
             raise NotFoundError("Artefato não encontrado.")
         found_production, key, integrity = found
         if production_id is not None and found_production != production_id:
             raise NotFoundError("Artefato não pertence a esta produção.")
 
-        candidate = self.artifact_root / integrity.path
+        candidate = root / integrity.path
         try:
             path = candidate.resolve()
-            path.relative_to(self.artifact_root)
+            path.relative_to(root)
         except (ValueError, OSError) as error:
             raise NotFoundError("Artefato fora da raiz permitida.") from error
         if not path.is_file():

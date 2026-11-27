@@ -142,7 +142,7 @@ def test_action_without_domain_returns_dependency_error(jobs: JobService) -> Non
     jobs.claim(job_id=receipt.job_id)
 
     with pytest.raises(DependencyUnavailableError):
-        jobs.run_default_executor(receipt.job_id, {"action": "resume"})
+        jobs.run_default_executor({"action": "resume"}, None)
 
 
 def test_control_checkpoint_reports_progress(jobs: JobService) -> None:

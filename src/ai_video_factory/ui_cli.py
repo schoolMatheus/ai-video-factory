@@ -59,7 +59,9 @@ def prepare_launch(project_root: Path, *, port: int, host: str = "127.0.0.1"):  
         project_root=root,
         data_root=data_root,
         control_db=data_root / "ui" / "control.sqlite3",
-        profiles_db=profiles_db if profiles_db.is_file() else None,
+        # A clean install must be able to create the first profile: the store
+        # creates the database on first use.
+        profiles_db=profiles_db,
         static_dir=static_dir,
         bind_host=host,
         port=port,

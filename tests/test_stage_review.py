@@ -33,7 +33,7 @@ def _context(tmp_path: Path) -> StageContext:
     }))
     request = ProductionRequest.model_validate({
         "production_id": "prod-1", "profile_id": "canal", "topic": "Tema",
-        "target_minutes": 1.0, "base_dir": str(tmp_path / "projects"),
+        "target_minutes": 1 / 60, "base_dir": str(tmp_path / "projects"),
     })
     request.project_dir.mkdir(parents=True, exist_ok=True)
     memory = build_memory_context(store, snapshot, "review", request.topic)
