@@ -15,6 +15,7 @@ from ai_video_factory.ui_backend.models import (
     ActionRequest,
     ArtifactView,
     CapabilitiesView,
+    DependencyUnavailableError,
     EventPage,
     FeedbackRequest,
     JobView,
@@ -29,6 +30,7 @@ from ai_video_factory.ui_backend.models import (
     ProfileView,
     ProductionCreateRequest,
     ProductionFilters,
+    ProductionMode,
     ProductionPage,
     ProductionView,
     StageName,
@@ -173,8 +175,19 @@ def create_production(
         raise InvalidRequestError("Cabeçalho Idempotency-Key é obrigatório.")
     job_service = jobs_of(request)
     production_id = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:32]
-    document = payload.model_dump()
-    document["production_id"] = production_id
+    settings = request.app.state.settings
+    data_root = settings.data_root or settings.project_root / "data"
+    # Persist a complete, valid ProductionRequest so the worker can resolve the
+    # same profile, paths and budget without reinterpreting form defaults.
+    document = {
+        "production_id": production_id,
+        "profile_id": payload.profile_id,
+        "topic": payload.topic,
+        "angle": payload.angle or "",
+        "target_minutes": payload.target_minutes or 25.0,
+        "seed_source_urls": list(payload.seed_source_urls),
+        "base_dir": str(data_root / "projects"),
+    }
     return job_service.submit(document, idempotency_key=idempotency_key)
 
 
@@ -190,13 +203,54 @@ def productions(
 ) -> ProductionPage:
     _, _, models = services_of(request)
     filters = ProductionFilters(profile_id=profile_id, state=state, search=search, since=since)
-    return models.list_productions(filters, cursor, page_size=page_size)
+    page = models.list_productions(filters, cursor, page_size=page_size)
+    known = {item.id for item in page.items}
+    for submission in jobs_of(request).store.all_staged_productions():
+        if str(submission["production_id"]) in known:
+            continue
+        if profile_id and str(submission.get("profile_id")) != profile_id:
+            continue
+        if state is not None and state != StageStatus.pending:
+            continue
+        page.items.insert(0, _staged_view(submission))
+    return page
+
+
+def _staged_view(submission: dict[str, object], job: JobView | None = None) -> ProductionView:
+    """Honest placeholder for a queued production whose worker has not started."""
+    topic = str(submission.get("topic") or submission["production_id"])
+    return ProductionView(
+        id=str(submission["production_id"]),
+        mode=ProductionMode.staged,
+        title=topic,
+        topic=topic,
+        profile_id=str(submission["profile_id"]) if submission.get("profile_id") else None,
+        state=StageStatus.pending,
+        capabilities=[
+            ActionAvailability(action="resume", enabled=True, reason=None),
+            ActionAvailability(action="stop_after_stage", enabled=job is not None, reason=None),
+        ],
+        started_at=str(submission.get("created_at")) if submission.get("created_at") else None,
+        updated_at=str(submission.get("updated_at")) if submission.get("updated_at") else None,
+    )
 
 
 @router.get("/productions/{production_id}", response_model=ProductionView)
 def production(production_id: str, request: Request) -> ProductionView:
     _, _, models = services_of(request)
-    return models.get_production(production_id)
+    try:
+        return models.get_production(production_id)
+    except NotFoundError:
+        job_service = jobs_of(request)
+        submission = job_service.store.staged_production(production_id)
+        if submission is None:
+            raise
+        job = None
+        try:
+            job = job_service.get_job(str(submission["job_id"]))
+        except NotFoundError:
+            pass
+        return _staged_view(submission, job)
 
 
 @router.get("/productions/{production_id}/stages/{stage}", response_model=StageView)
@@ -351,16 +405,20 @@ def action(
     production_id: str,
     action_request: ActionRequest,
     request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> OperationReceipt:
-    _, _, models = services_of(request)
-    models.get_production(production_id)
-    result = domain.execute_action(production_id, action_request)
-    return OperationReceipt(
-        job_id=result.production_id,
-        production_id=result.production_id,
-        status="queued",
-        accepted=True,
-    )
+    job_service = jobs_of(request)
+    try:
+        return job_service.request_action(
+            production_id, action_request, idempotency_key=idempotency_key or ""
+        )
+    except NotFoundError:
+        # A legacy run has no staged submission; confirm it is queryable first.
+        _, _, models = services_of(request)
+        models.get_production(production_id)
+        raise DependencyUnavailableError(
+            "Ações do fluxo novo não estão disponíveis para uma produção legada."
+        )
 
 
 @router.get("/profiles/{profile_id}/productions", response_model=ProductionPage)

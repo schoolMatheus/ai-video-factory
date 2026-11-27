@@ -69,19 +69,22 @@ def _stock_runners(data_root: Path) -> MediaStage:
 
 
 def build_runners(store: Any, snapshot: Any, data_root: Path) -> dict[StageName, Any]:
-    """Default runner map; tests replace this boundary with deterministic runners."""
+    """Default runner map; tests replace this boundary with deterministic runners.
+
+    The CLI and the UI worker use the same composition root in
+    ``workflow.services``; only the transports differ.
+    """
+    from ai_video_factory.workflow.services import build_production_services
+
     config = load_filmcraft_config(Path("config") / "filmcraft.toml")
     filmcraft = FilmCraftMcpClient(config) if config is not None else _UnconfiguredFilmCraft()
-    editing = EditingStage(filmcraft)
-    narration_languages = tuple(snapshot.settings.get("narration.languages", ("en",)))
-    return {
-        "research": ResearchStage(),
-        "script": ScriptStage(),
-        "narration": NarrationStage(),
-        "media": _stock_runners(data_root),
-        "editing": editing,
-        "review": ReviewStage(),
-    }
+    services = build_production_services(
+        snapshot,
+        {"data_root": data_root},
+        {"editor": filmcraft},
+        store=store,
+    )
+    return dict(services.runners)
 
 
 def _request(

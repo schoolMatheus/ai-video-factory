@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from ai_video_factory.sanitization import sanitize_diagnostic
 from ai_video_factory.ui_backend.control_store import ControlStore
@@ -60,9 +60,13 @@ class JobService:
         db_path: Path,
         *,
         heartbeat_ttl: int = DEFAULT_HEARTBEAT_TTL,
+        transports: Mapping[str, Any] | None = None,
+        services_factory: Any = None,
     ) -> None:
         self.store = ControlStore(db_path)
         self.heartbeat_ttl = heartbeat_ttl
+        self.transports = dict(transports or {})
+        self.services_factory = services_factory
 
     # -- submission --------------------------------------------------------
 
@@ -81,26 +85,33 @@ class JobService:
 
         job_id = uuid.uuid4().hex
         now = _now()
-        if not self.store.insert_idempotency(idempotency_key, job_id, now):
+        job = {
+            "job_id": job_id,
+            "production_id": production_id,
+            "status": JobStatus.queued.value,
+            "idempotency_key": idempotency_key,
+            "payload": json.dumps(request, sort_keys=True, ensure_ascii=False),
+            "worker_token": None,
+            "pid": None,
+            "heartbeat_at": None,
+            "result_reference": None,
+            "stop_requested": 0,
+            "progress": None,
+            "problem": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        production = {
+            "production_id": production_id,
+            "profile_id": request.get("profile_id"),
+            "topic": request.get("topic"),
+            "job_id": job_id,
+            "status": JobStatus.queued.value,
+            "created_at": now,
+            "updated_at": now,
+        }
+        if not self.store.submit_transaction(idempotency_key, job, production, now):
             return self._receipt(self.store.idempotent_job_id(idempotency_key) or job_id)
-        self.store.insert_job(
-            {
-                "job_id": job_id,
-                "production_id": production_id,
-                "status": JobStatus.queued.value,
-                "idempotency_key": idempotency_key,
-                "payload": json.dumps(request, sort_keys=True, ensure_ascii=False),
-                "worker_token": None,
-                "pid": None,
-                "heartbeat_at": None,
-                "result_reference": None,
-                "stop_requested": 0,
-                "progress": None,
-                "problem": None,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
         try:
             self._spawn(job_id)
         except OSError as error:
@@ -206,6 +217,7 @@ class JobService:
                 "updated_at": _now(),
             },
         )
+        self.dispatch_next()
 
     def checkpoint(self, job_id: str, token: str, stage: str) -> None:
         self._verify_token(job_id, token)
@@ -240,6 +252,24 @@ class JobService:
             job_id, {"heartbeat_at": now, "updated_at": now}
         )
 
+    def dispatch_next(self) -> str | None:
+        """Start the next queued job after a terminal one; claim stays atomic."""
+        job_id = self.store.next_queued_job_id()
+        if job_id is None:
+            return None
+        try:
+            self._spawn(job_id)
+        except OSError as error:
+            self.store.update_job(
+                job_id,
+                {
+                    "status": JobStatus.unknown.value,
+                    "problem": sanitize_diagnostic(error),
+                    "updated_at": _now(),
+                },
+            )
+        return job_id
+
     def complete(self, job_id: str, token: str, result_reference: str) -> None:
         self._verify_token(job_id, token)
         self.store.update_job(
@@ -251,6 +281,7 @@ class JobService:
                 "updated_at": _now(),
             },
         )
+        self.dispatch_next()
 
     def fail(self, job_id: str, token: str, error: object) -> None:
         self._verify_token(job_id, token)
@@ -263,6 +294,7 @@ class JobService:
                 "updated_at": _now(),
             },
         )
+        self.dispatch_next()
 
     # -- reconciliation and queries ----------------------------------------
 
@@ -296,11 +328,140 @@ class JobService:
                 expired.append(str(job["job_id"]))
         return expired
 
-    def run_default_executor(self, job_id: str, payload: dict[str, Any]) -> Any:
-        """Domain execution is enabled only when real stage runners are wired."""
-        raise DependencyUnavailableError(
-            "Execução das etapas ainda não está configurada neste ambiente."
+    # -- real domain execution --------------------------------------------
+
+    def _build_services(self, profile_id: str, request_payload: Mapping[str, Any]) -> Any:
+        from ai_video_factory.profiles.store import ProfileStore
+        from ai_video_factory.workflow.services import build_production_services
+
+        if self.services_factory is not None:
+            return self.services_factory(profile_id, request_payload)
+        data_root = self.store.db_path.parent.parent
+        store = ProfileStore(data_root / "profiles" / "profiles.sqlite3")
+        snapshot = store.get_snapshot(
+            profile_id, revision=request_payload.get("profile_revision")
         )
+        return build_production_services(
+            snapshot,
+            {"data_root": data_root},
+            self.transports,
+            store=store,
+        )
+
+    def run_default_executor(self, payload: dict[str, Any], control: Any = None) -> Any:
+        """Execute an accepted job through the shared production services.
+
+        The worker calls this as ``executor(payload, control)``; the job id is
+        carried in the persisted payload/context, not in the executor contract.
+        """
+        from ai_video_factory.workflow.services import execute_production_job
+
+        request_payload = payload.get("request")
+        if not isinstance(request_payload, dict):
+            # A submission from the HTTP API carries the request fields at the
+            # top level; an action job carries them under "request".
+            candidate = {
+                key: value for key, value in payload.items()
+                if key not in {"action", "action_payload", "through"}
+            }
+            if not {"production_id", "profile_id", "topic"} <= candidate.keys():
+                raise DependencyUnavailableError(
+                    "Pedido de produção ausente; esta solicitação não tem execução real."
+                )
+            request_payload = candidate
+        profile_id = request_payload.get("profile_id")
+        if not profile_id:
+            raise DependencyUnavailableError(
+                "Perfil ausente no pedido; não é possível compor serviços reais."
+            )
+        services = self._build_services(str(profile_id), request_payload)
+        return execute_production_job(
+            {**payload, "request": request_payload}, control, services
+        )
+
+    def request_action(
+        self,
+        production_id: str,
+        action: Any,
+        *,
+        idempotency_key: str,
+    ) -> OperationReceipt:
+        """Turn a typed action into a real job, or fail when it is unavailable."""
+        from ai_video_factory.ui_backend import domain
+        from ai_video_factory.ui_backend.models import NotFoundError
+
+        submission = self.store.staged_production(production_id)
+        if submission is None:
+            raise NotFoundError("Produção não encontrada.")
+        action_name = str(action.action)
+        if action_name == "stop_after_stage":
+            for job in self.store.all_jobs():
+                if (
+                    str(job.get("production_id")) == production_id
+                    and job.get("status") in {JobStatus.running.value, JobStatus.stop_requested.value}
+                ):
+                    self.request_stop(str(job["job_id"]))
+                    return self._receipt(str(job["job_id"]))
+            raise ConflictError("Nenhum job ativo nesta produção para receber parada.")
+
+        domain.execute_action(production_id, action)
+        key = idempotency_key or (
+            f"action:{production_id}:{action_name}:"
+            f"{json.dumps(action.payload, sort_keys=True, ensure_ascii=False)}"
+        )
+        existing = self.store.idempotent_job_id(key)
+        if existing is not None:
+            return self._receipt(existing)
+
+        job_id = uuid.uuid4().hex
+        now = _now()
+        payload = {
+            "action": action_name,
+            "production_id": production_id,
+            "request": {
+                "production_id": production_id,
+                "profile_id": submission.get("profile_id"),
+                "topic": submission.get("topic") or "retomada",
+                "target_minutes": 25.0,
+                "base_dir": str(self.store.db_path.parent.parent / "projects"),
+            },
+            "through": "review" if action_name != "open_editor" else "editing",
+            "action_payload": action.payload,
+        }
+        job = {
+            "job_id": job_id,
+            "production_id": production_id,
+            "status": JobStatus.queued.value,
+            "idempotency_key": key,
+            "payload": json.dumps(payload, sort_keys=True, ensure_ascii=False),
+            "worker_token": None,
+            "pid": None,
+            "heartbeat_at": None,
+            "result_reference": None,
+            "stop_requested": 0,
+            "progress": None,
+            "problem": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        submission_update = dict(submission)
+        submission_update["job_id"] = job_id
+        submission_update["status"] = JobStatus.queued.value
+        submission_update["updated_at"] = now
+        if not self.store.submit_transaction(key, job, submission_update, now):
+            return self._receipt(self.store.idempotent_job_id(key) or job_id)
+        try:
+            self._spawn(job_id)
+        except OSError as error:
+            self.store.update_job(
+                job_id,
+                {
+                    "status": JobStatus.unknown.value,
+                    "problem": sanitize_diagnostic(error),
+                    "updated_at": _now(),
+                },
+            )
+        return self._receipt(job_id)
 
     def get_job(self, job_id: str) -> JobView:
         job = self._job(job_id)

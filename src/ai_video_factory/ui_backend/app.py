@@ -115,6 +115,13 @@ def create_app(
     app.state.settings = settings
     app.state.services = services
 
+    if services.jobs is not None:
+
+        @app.on_event("startup")
+        def reconcile_jobs() -> None:
+            """Startup reconciliation observes evidence; it never relaunches."""
+            services.jobs.reconcile()
+
     @app.middleware("http")
     async def local_boundary(request: Request, call_next):  # type: ignore[no-untyped-def]
         host = _host_name(request.headers.get("host"))

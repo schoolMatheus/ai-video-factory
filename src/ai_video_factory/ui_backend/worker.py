@@ -35,10 +35,16 @@ def execute_job(
     if status in {"stopped", "stop_requested"}:
         if status == "stop_requested":
             service.confirm_stop(job_id, token)
-    elif control.stop_requested():
-        service.confirm_stop(job_id, token)
     else:
-        service.complete(job_id, token, str(result))
+        try:
+            stopped = bool(control.stop_requested())
+        except PermissionError:
+            # A checkpoint already confirmed the stop and cleared the token.
+            stopped = True
+        if stopped:
+            service.confirm_stop(job_id, token)
+        else:
+            service.complete(job_id, token, str(result))
     return result
 
 

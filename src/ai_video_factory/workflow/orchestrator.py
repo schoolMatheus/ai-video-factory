@@ -86,6 +86,7 @@ def run_production(
     run_store: RunStore | None = None,
     learning_reviewer: Callable | None = None,
     candidate_evaluator: object | None = None,
+    control: object | None = None,
 ) -> ProductionResult:
     """Run the stages up to ``through``, reusing valid deliveries on resume."""
     if through not in STAGE_ORDER:
@@ -136,6 +137,17 @@ def run_production(
     for stage in STAGE_ORDER:
         if STAGE_ORDER.index(stage) > STAGE_ORDER.index(through):
             break
+        if _stop_requested(control):
+            # Cooperative stop at a stage boundary: the delivery already
+            # persisted stays valid, and no external command is killed.
+            return ProductionResult(
+                production_id=resolved.production_id,
+                profile_id=resolved.profile_id,
+                status="pending",
+                final_stage=stage,
+                project_dir=str(project_dir),
+                artifacts=all_artifacts,
+            )
         runner = runners.get(stage)
         if runner is None:
             raise StageExecutionError(f"no runner configured for stage {stage}")
@@ -276,6 +288,10 @@ def run_production(
                 )
             )
 
+        if control is not None and hasattr(control, "checkpoint"):
+            # A requested stop is confirmed here, at a persisted safe point.
+            control.checkpoint(stage)
+
     review = results.get("review")
     package_ref = review.artifacts.get("package") if review else None
     # The registered artifact is the manifest; the deliverable is its directory.
@@ -290,6 +306,16 @@ def run_production(
         package_path=str(package_dir) if package_dir else None,
         learning_revision_ids=learning_ids,
     )
+
+
+def _stop_requested(control: object | None) -> bool:
+    """Read a cooperative stop signal; a cleared worker token means stopped."""
+    if control is None or not hasattr(control, "stop_requested"):
+        return False
+    try:
+        return bool(control.stop_requested())
+    except PermissionError:
+        return True
 
 
 def _predecessors(stage: StageName) -> tuple[StageName, ...]:
