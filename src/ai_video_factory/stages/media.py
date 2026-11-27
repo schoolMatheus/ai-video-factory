@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,6 +20,18 @@ from ai_video_factory.workflow.models import (
     RightsRecord,
     StageResult,
 )
+
+def _safe_media_path(directory: Path, identity: str, suffix: str) -> Path:
+    """Contained, cross-platform filename derived from a candidate identity."""
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+    tail = identity.split("?", 1)[0].rsplit("/", 1)[-1]
+    stem = re.sub(r"[^A-Za-z0-9_-]", "-", tail)[:32] or "media"
+    safe_suffix = re.sub(r"[^A-Za-z0-9.]", "", suffix) or ".bin"
+    destination = (directory / f"{stem}-{digest}{safe_suffix}").resolve()
+    if directory.resolve() not in destination.parents:
+        raise ValueError("media destination escapes the production directory")
+    return destination
+
 
 CandidateSearch = Callable[[str, int], list[dict[str, Any]]]
 AssetFetch = Callable[[dict[str, Any], Path], Path | None]
@@ -104,7 +118,10 @@ class MediaStage:
                     if self.fetch is not None:
                         source = self.fetch(raw, files_dir)
                         if source is not None and source.is_file():
-                            destination = files_dir / f"{candidate_id}{source.suffix}"
+                            # A URL is not a Windows filename. Keep the provider
+                            # id and URL as metadata; derive a safe, stable name
+                            # from a digest of the candidate identity.
+                            destination = _safe_media_path(files_dir, candidate_id, source.suffix)
                             if source.resolve() != destination.resolve():
                                 destination.write_bytes(source.read_bytes())
                             file_ref = ArtifactRef.from_path(

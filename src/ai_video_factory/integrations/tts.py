@@ -51,6 +51,7 @@ class LocalTtsProvider:
         speed_wpm: int = 170,
         pitch: int = 50,
         synthesizer: Any = None,
+        allow_engine_fallback: bool = False,
     ) -> None:
         self.root = Path(root)
         self.provider = provider
@@ -61,6 +62,7 @@ class LocalTtsProvider:
         self.speed_wpm = speed_wpm
         self.pitch = pitch
         self.synthesizer = synthesizer or synthesize_to_wav
+        self.allow_engine_fallback = allow_engine_fallback
 
     def capabilities(self) -> TtsCapabilities:
         return TtsCapabilities(
@@ -74,7 +76,8 @@ class LocalTtsProvider:
     def synthesize(self, request: SpeechRequest, destination: Path) -> SpeechResult:
         capabilities = self.capabilities()
         language = request.language.split("-", 1)[0].lower()
-        if language not in capabilities.languages:
+        supported = {item.split("-", 1)[0].lower() for item in capabilities.languages}
+        if language not in supported:
             raise TtsCapabilityError(
                 f"provider {self.provider} does not support language {request.language}; "
                 "no silent fallback to another language/voice"
@@ -92,6 +95,22 @@ class LocalTtsProvider:
             )
         except NarrationError as error:
             raise TtsCapabilityError(str(error)) from error
+        effective_engine = str(metadata.get("tts_engine", self.provider))
+        effective_voice = str(metadata.get("tts_voice", request.voice))
+        effective_language = str(metadata.get("tts_language", request.language.split("-", 1)[0]))
+        if (
+            not self.allow_engine_fallback
+            and (
+                effective_engine != self.provider
+                or (effective_voice and effective_voice != request.voice)
+                or effective_language.split("-", 1)[0] != language
+            )
+        ):
+            raise TtsCapabilityError(
+                f"engine/voz/idioma efetivos ({effective_engine}, {effective_voice}, "
+                f"{effective_language}) divergem do contrato ({self.provider}, "
+                f"{request.voice}, {request.language}); degradação não permitida"
+            )
         duration = wav_duration(destination)
         if duration is None or duration <= 0:
             raise TtsCapabilityError(f"provider {self.provider} did not produce measurable audio")

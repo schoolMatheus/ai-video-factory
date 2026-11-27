@@ -105,6 +105,36 @@ def test_multiple_shots_own_file_irrelevant_candidate_and_duplicate(tmp_path: Pa
     assert bundle["selected"][0]["file"]["path"].endswith(".mp4")
 
 
+def test_url_identity_produces_a_safe_contained_filename(tmp_path: Path) -> None:
+    context = _context(tmp_path, "canal-url")
+    own_file = tmp_path / "own.mp4"
+    own_file.write_bytes(b"video")
+
+    def search(query: str, limit: int) -> list[dict[str, Any]]:
+        return [{
+            "id": "https://stock.example/clips/abc?token=1",
+            "url": "https://stock.example/clips/abc?token=1",
+            "title": "imagem de shot-1", "license": "CC0",
+            "path": str(own_file),
+        }]
+
+    result = MediaStage(
+        search=search,
+        fetch=lambda raw, directory: Path(str(raw["path"])),
+        memory=_memory(tmp_path, "canal-url"), data_dir=tmp_path / "data",
+    ).run(context, _inputs(context, ["shot-1"]))
+
+    bundle = result.artifacts["bundle"].read_json(context.project_dir)
+    candidate = bundle["candidates"][0]
+    file_path = candidate["file"]["path"]
+    filename = Path(file_path).name
+    assert "/" not in filename and "\\" not in filename and ":" not in filename
+    assert candidate["url"].startswith("https://stock.example/")
+    resolved = (context.project_dir / file_path).resolve()
+    assert context.project_dir.resolve() in resolved.parents
+    assert resolved.is_file()
+
+
 def test_license_gap_blocks_final_and_attribution_is_preserved(tmp_path: Path) -> None:
     context = _context(tmp_path, "canal-a")
     def search(query: str, limit: int) -> list[dict[str, Any]]:

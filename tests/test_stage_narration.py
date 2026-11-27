@@ -117,6 +117,36 @@ def test_spoken_text_pauses_and_measured_duration(tmp_path: Path) -> None:
     assert result.artifacts["spoken_text"].resolve(context.project_dir).is_file()
 
 
+def test_engine_degradation_is_blocked_unless_explicitly_allowed(tmp_path: Path) -> None:
+    from ai_video_factory.integrations.tts import LocalTtsProvider
+    from ai_video_factory.workflow.models import SpeechRequest
+
+    def degrading_synthesizer(text: str, destination: Path, **kwargs: Any) -> None:
+        _write_wav(destination, 1.0)
+        kwargs["metadata"].update({
+            "tts_engine": "espeak", "tts_voice": "en-us", "tts_language": "en",
+        })
+
+    provider = LocalTtsProvider(
+        tmp_path, provider="kokoro", languages=("pt-BR",), voices=("voz-aprovada",),
+        synthesizer=degrading_synthesizer,
+    )
+    request = SpeechRequest(
+        text="Texto", speakable_text="Texto", language="pt-BR", voice="voz-aprovada",
+        scene_id="s1", shot_id="sh1", segment_id="n1",
+    )
+    with pytest.raises(Exception, match="engine|voz|idioma|language"):
+        provider.synthesize(request, tmp_path / "degradado.wav")
+
+    allowed = LocalTtsProvider(
+        tmp_path, provider="kokoro", languages=("pt-BR",), voices=("voz-aprovada",),
+        allow_engine_fallback=True, synthesizer=degrading_synthesizer,
+    )
+    result = allowed.synthesize(request, tmp_path / "permitido.wav")
+    assert result.voice == "en-us"
+    assert result.provider == "espeak"
+
+
 def test_alignment_marks_word_precision(tmp_path: Path) -> None:
     context, inputs = _context_and_inputs(tmp_path)
     provider = FakeTts(context.project_dir)

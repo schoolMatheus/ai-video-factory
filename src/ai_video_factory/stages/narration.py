@@ -45,6 +45,7 @@ class NarrationStage:
                 root,
                 languages=tuple(context.setting("narration.languages", ("en",))),
                 voices=tuple(context.setting("narration.voices", ("af_heart",))),
+                allow_engine_fallback=bool(context.setting("narration.allow_engine_fallback", False)),
             ))
             provider = factory(context.project_dir)
         capabilities = provider.capabilities()
