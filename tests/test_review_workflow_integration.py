@@ -55,7 +55,7 @@ def _request(tmp_path: Path, production_id: str = "prod-review") -> ProductionRe
         "production_id": production_id,
         "profile_id": "canal",
         "topic": "Tema informado",
-        "target_minutes": 1.0,
+        "target_minutes": 1 / 60,
         "base_dir": str(tmp_path / "projects"),
     })
 
@@ -222,6 +222,7 @@ def test_cli_review_rejection_exits_nonzero(tmp_path: Path, monkeypatch: Any) ->
 
     result = CliRunner().invoke(workflow_cli.workflow_app, [
         "run", "--profile", "canal", "--topic", "Tema", "--production", "prod-cli",
+        "--target-minutes", "0.0166667",
         "--base-dir", str(tmp_path / "projects"),
     ])
 
@@ -239,6 +240,7 @@ def test_cli_approved_review_produces_registered_package(tmp_path: Path, monkeyp
 
     result = CliRunner().invoke(workflow_cli.workflow_app, [
         "run", "--profile", "canal", "--topic", "Tema", "--production", "prod-cli-ok",
+        "--target-minutes", "0.0166667",
         "--base-dir", str(tmp_path / "projects"),
     ])
 

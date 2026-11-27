@@ -177,7 +177,7 @@ def _profile_store(tmp_path: Path) -> ProfileStore:
 def _submit(http: TestClient, key: str, topic: str = "Tema") -> dict[str, Any]:
     response = http.post(
         "/api/v1/productions",
-        json={"profile_id": "canal", "topic": topic},
+        json={"profile_id": "canal", "topic": topic, "target_minutes": 1 / 60},
         headers={"Idempotency-Key": key},
     )
     assert response.status_code == 202, response.text

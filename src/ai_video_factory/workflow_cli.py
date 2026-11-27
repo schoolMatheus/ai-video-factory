@@ -116,7 +116,7 @@ def run(
     profile: str = typer.Option(..., "--profile", help="Explicit channel profile id (never inferred)"),
     topic: str = typer.Option(..., "--topic", help="Topic supplied by the operator"),
     angle: str = typer.Option("", "--angle", help="Editorial angle"),
-    target_minutes: float = typer.Option(25.0, "--target-minutes", min=1.0),
+    target_minutes: float = typer.Option(25.0, "--target-minutes", min=0.01),
     through: str = typer.Option("review", "--through", help="Last stage to execute"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan without external services or learning"),
     base_dir: str | None = typer.Option(None, "--base-dir", help="Production root override"),
