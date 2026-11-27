@@ -52,6 +52,7 @@ def _activate(
     store.save_candidate(candidate)
     evaluation = LearningEvaluation(
         evaluation_id=f"eval-{candidate_id}", candidate_id=candidate_id, candidate_version=1,
+        trial="ensaio controlado",
         result="pass", checks=[EvaluationCheck(name="trial", passed=True)],
     )
     store.save_evaluation(evaluation)

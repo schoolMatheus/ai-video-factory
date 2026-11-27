@@ -624,6 +624,14 @@ class ProfileStore:
                 raise ProfileStoreError(f"candidate {candidate_id} cannot be activated from {candidate.state}")
             if evaluation.result != "pass":
                 raise ProfileStoreError("only a passing evaluation can activate a learning")
+            if not evaluation.trial.strip() or not evaluation.checks or not all(
+                item.passed for item in evaluation.checks
+            ):
+                raise ProfileStoreError(
+                    "activation requires a real trial and passing checks on the immutable candidate"
+                )
+            if evaluation.candidate_version < 1:
+                raise ProfileStoreError("evaluation has no immutable candidate version")
             snapshot = self._current_snapshot(connection, candidate.profile_id)
             if snapshot.revision != expected_revision:
                 raise RevisionConflict(

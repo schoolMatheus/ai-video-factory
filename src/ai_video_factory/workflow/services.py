@@ -59,7 +59,7 @@ class ProductionServices:
         return {
             "profile_id": self.snapshot.profile_id,
             "profile_revision": self.snapshot.revision,
-            "stages": [stage.value for stage in self.runners],
+            "stages": [str(stage) for stage in self.runners],
         }
 
 
@@ -181,6 +181,40 @@ def default_script_generator() -> Any:
     return generate
 
 
+class RuleBasedEvaluator:
+    """Bounded trial: evidence, scope and typed patch, no aesthetic weights."""
+
+    def evaluate(self, candidate: Any, context: Any) -> Any:
+        from uuid import uuid4
+
+        from ai_video_factory.profiles.models import EvaluationCheck, LearningEvaluation
+
+        evidence_ok = bool(candidate.evidence_ids)
+        checks = [
+            EvaluationCheck(name="evidence", passed=evidence_ok,
+                            detail="evidência persistida" if evidence_ok else "sem evidência"),
+            EvaluationCheck(name="typed_patch", passed=bool(candidate.change.path)),
+        ]
+        return LearningEvaluation(
+            evaluation_id=uuid4().hex, candidate_id=candidate.candidate_id,
+            candidate_version=1, trial="rule-based policy check",
+            evidence_ids=list(candidate.evidence_ids), checks=checks,
+            result="pass" if all(item.passed for item in checks) else "inconclusive",
+            rationale="ensaio determinístico sem pesos calibrados",
+        )
+
+
+def default_learning_transports() -> dict[str, Any]:
+    """Autonomous learning hooks wired by default, without human approval."""
+
+    def reviewer(context: Any, observations: list[Any]) -> list[Any]:
+        from ai_video_factory.profiles.learning import review_observations
+
+        return review_observations(context, observations)
+
+    return {"learning_reviewer": reviewer, "candidate_evaluator": RuleBasedEvaluator()}
+
+
 def build_production_services(
     snapshot: ProfileSnapshot,
     paths: Mapping[str, Any],
@@ -227,13 +261,14 @@ def build_production_services(
         "editing": transports.get("editing") or EditingStage(editor),
         "review": transports.get("review") or ReviewStage(),
     }
+    learning = default_learning_transports()
     return ProductionServices(
         snapshot=snapshot,
         runners=runners,
         store=resolved_store,
         paths={"data_root": data_root, "profile_db": profile_db},
-        learning_reviewer=transports.get("learning_reviewer"),
-        evaluator=transports.get("candidate_evaluator"),
+        learning_reviewer=transports.get("learning_reviewer", learning["learning_reviewer"]),
+        evaluator=transports.get("candidate_evaluator", learning["candidate_evaluator"]),
     )
 
 

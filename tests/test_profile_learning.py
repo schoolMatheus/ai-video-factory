@@ -48,6 +48,9 @@ def _context(tmp_path: Path, *, autonomous: bool = True, explicit: list[str] | N
         "target_minutes": 1.0, "base_dir": str(tmp_path / "projects"),
     })
     store.record_production("prod-1", "canal", "state/run_ids.json")
+    evidence = tmp_path / "projects" / "canal" / "prod-1" / "artifacts" / "05_editing" / "log.json"
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text("{}", encoding="utf-8")
     memory = build_memory_context(store, snapshot, "editing", request.topic)
     return store, StageContext(
         request=request, snapshot=snapshot, stage="editing", attempt=1,
@@ -66,6 +69,7 @@ class PassingEvaluator:
             evaluation_id=uuid4().hex,
             candidate_id=candidate.candidate_id,
             candidate_version=1,
+            trial="ensaio controlado",
             result="pass",
             checks=[EvaluationCheck(name="trial", passed=True)],
             rationale="ensaio controlado verificou a mudança",
@@ -159,7 +163,8 @@ def test_new_editor_version_suspends_incompatible_rule(tmp_path: Path) -> None:
     store.save_candidate(candidate)
     store.save_evaluation(LearningEvaluation(
         evaluation_id=uuid4().hex, candidate_id=candidate.candidate_id,
-        candidate_version=1, result="pass", checks=[EvaluationCheck(name="trial", passed=True)],
+        candidate_version=1, trial="ensaio controlado",
+        result="pass", checks=[EvaluationCheck(name="trial", passed=True)],
     ))
     learning = store.get_snapshot("canal")
     store.activate_learning(

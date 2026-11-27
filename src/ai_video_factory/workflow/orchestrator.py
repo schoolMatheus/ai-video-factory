@@ -237,6 +237,13 @@ def run_production(
                 )
                 return _failed_result(resolved, stage, results, all_artifacts, failure)
             external_calls += 1
+            _write_json(state_dir / "budget_usage.json", {
+                "production_id": resolved.production_id,
+                "external_calls": external_calls,
+                "max_external_calls": budget.max_external_calls,
+                "attempt": context.attempt,
+                "trials": len(learning_ids),
+            })
 
         manifest = runs.start(stage, inputs_payload)
         run_ids = _load_json(run_ids_path)
@@ -257,6 +264,11 @@ def run_production(
                   "evidence_refs": [], "event_key": f"{resolved.production_id}:{stage}:failed"}],
                 context.effective_settings, context.tool_versions,
             )
+            if learning_reviewer is not None and not dry_run:
+                _apply_learning(
+                    store, context, stage, resolved.production_id,
+                    learning_reviewer, candidate_evaluator,
+                )
             return _failed_result(resolved, stage, results, all_artifacts, failure)
 
         # Persistence and integrity checks happen after the runner returns. A
