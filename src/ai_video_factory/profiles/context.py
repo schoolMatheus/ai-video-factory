@@ -103,6 +103,17 @@ def _compatible(learning: LearningRevision, snapshot: ProfileSnapshot) -> bool:
     return all(snapshot.tool_versions.get(tool) == version for tool, version in required.items())
 
 
+def _condition_applies(learning: LearningRevision, topic: str) -> bool:
+    """Only rules whose application condition is met may change settings."""
+    condition = (learning.condition or "always").strip()
+    if condition in {"always", ""}:
+        return True
+    if condition.startswith("topic:"):
+        token = condition.split(":", 1)[1].casefold()
+        return bool(token) and token in _token_set(topic)
+    return False
+
+
 def build_memory_context(
     store: ProfileStore,
     snapshot: ProfileSnapshot,
@@ -124,8 +135,12 @@ def build_memory_context(
         for learning in store.list_learnings(snapshot.profile_id, stage=stage)
         if learning.learning_id in snapshot.active_learning_ids
         and _compatible(learning, snapshot)
+        and _condition_applies(learning, topic)
     ]
-    resolved = resolve_settings(snapshot.settings)
+    # Start from explicit baseline settings when available: a learning whose
+    # condition/tool version no longer applies must have no effect, not merely
+    # a hidden id.
+    resolved = store.base_settings(snapshot.profile_id) or resolve_settings(snapshot.settings)
     # Learnings are applied in a stable order; explicit channel choices win
     # because an explicit key is never overwritten by an inferred value.
     for learning in sorted(learnings, key=lambda item: item.learning_id):

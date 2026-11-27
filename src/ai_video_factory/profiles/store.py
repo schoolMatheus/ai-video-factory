@@ -95,9 +95,9 @@ class ProfileStore:
             current = connection.execute(
                 "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
             ).fetchone()[0]
-            if current >= _SCHEMA_VERSION:
-                return
-            connection.executescript(
+            fresh = current < _SCHEMA_VERSION
+            if fresh:
+                connection.executescript(
                 """
                 CREATE TABLE profiles (
                     profile_id TEXT PRIMARY KEY,
@@ -171,10 +171,27 @@ class ProfileStore:
                 );
                 """
             )
+            if fresh:
+                connection.execute(
+                    "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+                    (_SCHEMA_VERSION, utc_now()),
+                )
+            # Additive, reversible migration: explicit baseline settings stay
+            # separate from inferred values. Existing history is never erased.
+            from ai_video_factory.profiles.context import resolve_settings
+
             connection.execute(
-                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-                (_SCHEMA_VERSION, utc_now()),
+                "CREATE TABLE IF NOT EXISTS profile_bases ("
+                "profile_id TEXT PRIMARY KEY, settings_json TEXT NOT NULL)"
             )
+            for row in connection.execute(
+                "SELECT profile_id, snapshot_json FROM profile_revisions WHERE revision = 1"
+            ).fetchall():
+                snapshot = ProfileSnapshot.model_validate(json.loads(row["snapshot_json"]))
+                connection.execute(
+                    "INSERT OR IGNORE INTO profile_bases (profile_id, settings_json) VALUES (?, ?)",
+                    (row["profile_id"], json.dumps(resolve_settings(snapshot.settings))),
+                )
 
     def close(self) -> None:
         """No-op: connections are per-operation. Kept for symmetry with other stores."""
@@ -182,6 +199,8 @@ class ProfileStore:
     # -- profiles --------------------------------------------------------
 
     def create_profile(self, spec: ProfileSpec) -> ProfileSnapshot:
+        from ai_video_factory.profiles.context import resolve_settings
+
         snapshot = make_snapshot(spec)
         with self._write() as connection:
             try:
@@ -193,6 +212,10 @@ class ProfileStore:
             except sqlite3.IntegrityError as error:
                 raise ProfileStoreError(f"profile {spec.profile_id} already exists") from error
             self._insert_snapshot(connection, snapshot, "profile created")
+            connection.execute(
+                "INSERT OR REPLACE INTO profile_bases (profile_id, settings_json) VALUES (?, ?)",
+                (spec.profile_id, json.dumps(resolve_settings(spec.settings))),
+            )
         return snapshot
 
     def get_snapshot(self, profile_id: str, revision: int | None = None) -> ProfileSnapshot:
@@ -220,6 +243,8 @@ class ProfileStore:
         expected_revision: int,
         reason: str,
     ) -> ProfileSnapshot:
+        from ai_video_factory.profiles.context import resolve_settings
+
         with self._write() as connection:
             snapshot = self._current_snapshot(connection, profile_id)
             if snapshot.revision != expected_revision:
@@ -228,7 +253,24 @@ class ProfileStore:
                 )
             revised = apply_profile_patch(snapshot, patch, reason)
             self._insert_snapshot(connection, revised, reason)
+            row = connection.execute(
+                "SELECT settings_json FROM profile_bases WHERE profile_id = ?", (profile_id,)
+            ).fetchone()
+            base = json.loads(row["settings_json"]) if row else resolve_settings(snapshot.settings)
+            base.update(resolve_settings(patch.settings))
+            connection.execute(
+                "INSERT OR REPLACE INTO profile_bases (profile_id, settings_json) VALUES (?, ?)",
+                (profile_id, json.dumps(base)),
+            )
         return revised
+
+    def base_settings(self, profile_id: str) -> dict[str, Any] | None:
+        """Explicit baseline only; inferred learning values are never stored here."""
+        with self._read() as connection:
+            row = connection.execute(
+                "SELECT settings_json FROM profile_bases WHERE profile_id = ?", (profile_id,)
+            ).fetchone()
+        return json.loads(row["settings_json"]) if row else None
 
     def list_profiles(self) -> list[ProfileSnapshot]:
         with self._read() as connection:
@@ -451,6 +493,12 @@ class ProfileStore:
                 "SELECT 1 FROM profiles WHERE profile_id = ?", (candidate.profile_id,)
             ).fetchone() is None:
                 raise NotFound(f"profile {candidate.profile_id} was not found")
+            existing = connection.execute(
+                "SELECT profile_id FROM learning_candidates WHERE candidate_id = ?",
+                (candidate.candidate_id,),
+            ).fetchone()
+            if existing is not None and existing["profile_id"] != candidate.profile_id:
+                raise ScopeViolation("candidate_id belongs to another profile")
             connection.execute(
                 "INSERT INTO learning_candidates "
                 "(candidate_id, profile_id, stage, state, payload_json, created_at) "
@@ -541,15 +589,22 @@ class ProfileStore:
             )
         return evaluation.evaluation_id
 
-    def get_evaluation(self, evaluation_id: str) -> LearningEvaluation:
+    def get_evaluation(
+        self, evaluation_id: str, *, profile_id: str | None = None
+    ) -> LearningEvaluation:
         with self._read() as connection:
             row = connection.execute(
-                "SELECT payload_json FROM learning_evaluations WHERE evaluation_id = ?",
+                "SELECT payload_json, candidate_id FROM learning_evaluations WHERE evaluation_id = ?",
                 (evaluation_id,),
             ).fetchone()
         if row is None:
             raise NotFound(f"evaluation {evaluation_id} was not found")
-        return LearningEvaluation.model_validate(json.loads(row["payload_json"]))
+        evaluation = LearningEvaluation.model_validate(json.loads(row["payload_json"]))
+        if profile_id is not None:
+            candidate = self.get_candidate(evaluation.candidate_id, profile_id=profile_id)
+            if candidate.profile_id != profile_id:
+                raise ScopeViolation("evaluation belongs to another profile")
+        return evaluation
 
     # -- learning activation / suspension --------------------------------
 
@@ -669,11 +724,29 @@ class ProfileStore:
                 (revision.model_dump_json(), learning_id),
             )
             active_ids = [item for item in snapshot.active_learning_ids if item != learning_id]
-            # Rebuild from the revision before activation so the suspended
-            # patch is actually removed from effective settings.
-            base = self._snapshot_at(connection, profile_id, snapshot.revision - 1) or snapshot
+            # Remove only the suspended patch from the current baseline. Using
+            # the pre-activation snapshot would also discard explicit choices
+            # the operator made after that activation.
+            baseline_settings = dict(snapshot.settings)
+            changed_key = revision.action.path.removeprefix("settings.")
+            if changed_key not in snapshot.explicit_fields:
+                base = self.base_settings(profile_id) or {}
+                if changed_key in base:
+                    baseline_settings[changed_key] = base[changed_key]
+                else:
+                    baseline_settings.pop(changed_key, None)
+            baseline = snapshot.model_copy(update={"settings": baseline_settings})
+            payload = {
+                "settings": baseline_settings,
+                "policies": {
+                    "review_policy": snapshot.review_policy.model_dump(),
+                    "learning_policy": snapshot.learning_policy.model_dump(),
+                },
+                "budget": snapshot.operation_budget.model_dump(),
+                "tool_versions": dict(snapshot.tool_versions),
+            }
             restored = self._rebuild_snapshot(
-                base, active_ids, connection,
+                baseline, active_ids, connection, payload=payload,
                 reason=f"suspended learning {learning_id}",
                 revision=snapshot.revision + 1,
             )
@@ -764,22 +837,23 @@ class ProfileStore:
                 "budget": snapshot.operation_budget.model_dump(),
                 "tool_versions": dict(snapshot.tool_versions),
             }
-            if connection is not None:
-                active_payloads = []
-                for learning_id in active_ids:
-                    row = connection.execute(
-                        "SELECT payload_json FROM learning_revisions WHERE learning_id = ?",
-                        (learning_id,),
-                    ).fetchone()
-                    if row is not None:
-                        active_payloads.append(LearningRevision.model_validate(json.loads(row["payload_json"])))
-                for learning in sorted(active_payloads, key=lambda item: item.learning_id):
-                    applied = learning.action.apply(snapshot)
-                    for key in ("settings", "tool_versions"):
-                        payload[key].update(applied[key])
-                    for policy_name, values in applied["policies"].items():
-                        payload["policies"][policy_name].update(values)
-                    payload["budget"].update(applied["budget"])
+        if connection is not None:
+            active_payloads = []
+            for learning_id in active_ids:
+                row = connection.execute(
+                    "SELECT payload_json FROM learning_revisions WHERE learning_id = ?",
+                    (learning_id,),
+                ).fetchone()
+                if row is not None:
+                    active_payloads.append(LearningRevision.model_validate(json.loads(row["payload_json"])))
+            # Deterministic lineage: activation order, not id lexical order.
+            for learning in sorted(active_payloads, key=lambda item: item.activated_at):
+                applied = learning.action.apply(snapshot)
+                for key in ("settings", "tool_versions"):
+                    payload[key].update(applied[key])
+                for policy_name, values in applied["policies"].items():
+                    payload["policies"][policy_name].update(values)
+                payload["budget"].update(applied["budget"])
         revision = revision if revision is not None else snapshot.revision + 1
         from ai_video_factory.profiles.models import (
             LearningPolicy,
