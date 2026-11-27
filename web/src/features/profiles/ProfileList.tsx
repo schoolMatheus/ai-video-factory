@@ -32,6 +32,7 @@ export function ProfileList() {
           <thead>
             <tr>
               <th>Canal</th>
+              <th>ID</th>
               <th>Revisão</th>
               <th>Ações</th>
             </tr>
@@ -40,6 +41,7 @@ export function ProfileList() {
             {list.data.items.map((profile) => (
               <tr key={profile.id}>
                 <td>{profile.name}</td>
+                <td>{profile.id}</td>
                 <td>{profile.revision}</td>
                 <td>
                   <Link to={`/perfis?perfil=${encodeURIComponent(profile.id)}`}>Editar</Link>

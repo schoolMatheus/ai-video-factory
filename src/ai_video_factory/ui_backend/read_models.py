@@ -82,14 +82,15 @@ def _sort_key(run: _ObservedRun) -> tuple[datetime, str]:
 
 
 def _page_key(run: _ObservedRun) -> tuple[str, str]:
-    production_id = str(run.manifest.inputs.get("production_id") or run.manifest.run_id)
-    return production_id, run.manifest.updated_at
+    """(updated_at, identity) matches the reverse sort used by the page."""
+    identity = str(run.manifest.inputs.get("production_id") or run.manifest.run_id)
+    return run.manifest.updated_at, identity
 
 
 def _encode_cursor(key: tuple[str, str]) -> str:
     from ai_video_factory.ui_backend.cursors import encode_cursor
 
-    return encode_cursor({"k": "page", "p": key[0], "u": key[1]})
+    return encode_cursor({"k": "page", "u": key[0], "p": key[1]})
 
 
 def _decode_cursor(cursor: str) -> tuple[str, str]:
@@ -97,9 +98,9 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
 
     try:
         payload = decode_cursor(cursor)
-        if payload.get("k") != "page" or not isinstance(payload.get("p"), str):
+        if payload.get("k") != "page" or not isinstance(payload.get("u"), str):
             raise ValueError("wrong cursor kind")
-        return str(payload["p"]), str(payload["u"])
+        return str(payload["u"]), str(payload.get("p", ""))
     except (ValueError, KeyError, TypeError) as error:
         raise InvalidRequestError("Cursor de paginação inválido.") from error
 

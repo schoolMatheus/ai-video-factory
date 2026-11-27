@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from ai_video_factory.profiles.context import build_memory_context, stage_settings_digest
 from ai_video_factory.profiles.models import (
+    EvaluationCheck,
     LearningCandidate,
     LearningEvaluation,
     Observation,
@@ -56,6 +57,8 @@ def _activate(
         evaluation_id=uuid4().hex,
         candidate_id=candidate_id,
         candidate_version=1,
+        trial="ensaio controlado",
+        checks=[EvaluationCheck(name="trial", passed=True)],
         result="pass",
     ))
     return store.activate_learning(

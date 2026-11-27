@@ -75,7 +75,7 @@ def _activate_music(store: ProfileStore, profile_id: str) -> str:
     evaluation_id = uuid4().hex
     store.save_evaluation(LearningEvaluation(
         evaluation_id=evaluation_id, candidate_id=candidate_id,
-        candidate_version=1, result="pass",
+        candidate_version=1, trial="ensaio controlado", result="pass",
         checks=[EvaluationCheck(name="trial", passed=True)],
     ))
     store.activate_learning(
