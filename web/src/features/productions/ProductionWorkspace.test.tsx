@@ -146,6 +146,35 @@ describe("ProductionWorkspace", () => {
     await waitFor(() => expect(button).toBeEnabled());
   });
 
+  it("atualiza o snapshot quando um evento nomeado chega", async () => {
+    renderWorkspace();
+    expect(await screen.findByText("Produção real")).toBeInTheDocument();
+
+    setCurrentProduction({
+      id: "d".repeat(32),
+      mode: "legacy",
+      title: "Produção atualizada",
+      topic: "Tema",
+      profile_id: "canal-a",
+      profile_revision: null,
+      snapshot_id: null,
+      state: "completed",
+      observed_stages: ["research"],
+      stages: [],
+      artifacts: [],
+      capabilities: [],
+      problems: [],
+      started_at: null,
+      updated_at: "2026-11-26T00:00:00+00:00",
+      cursor: null,
+    });
+    act(() => {
+      FakeEventSource.instances[0]?.emit("stage.completed", "{}", "evt-2");
+    });
+
+    expect(await screen.findByText("Produção atualizada")).toBeInTheDocument();
+  });
+
   it("não mistura eventos de outra produção", async () => {
     renderWorkspace();
 

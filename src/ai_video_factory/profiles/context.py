@@ -162,7 +162,6 @@ def build_memory_context(
     digest = canonical_digest(
         {
             "profile_id": snapshot.profile_id,
-            "revision": snapshot.revision,
             "stage": stage,
             "topic": topic,
             "rules": rules,

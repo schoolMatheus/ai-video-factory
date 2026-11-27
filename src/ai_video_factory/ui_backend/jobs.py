@@ -405,6 +405,13 @@ class JobService:
             raise ConflictError("Nenhum job ativo nesta produção para receber parada.")
 
         domain.execute_action(production_id, action)
+        changed: set[str] = set()
+        if action_name == "revise_script":
+            changed = {"script.scene"}
+        elif action_name == "replace_media":
+            changed = {"media.shot"}
+        elif action_name == "reconcile_editor":
+            changed = {"editing.project"}
         key = idempotency_key or (
             f"action:{production_id}:{action_name}:"
             f"{json.dumps(action.payload, sort_keys=True, ensure_ascii=False)}"
@@ -427,6 +434,7 @@ class JobService:
             },
             "through": "review" if action_name != "open_editor" else "editing",
             "action_payload": action.payload,
+            "invalidation_inputs": sorted(changed),
         }
         job = {
             "job_id": job_id,

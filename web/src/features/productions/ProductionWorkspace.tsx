@@ -150,6 +150,18 @@ export function ProductionWorkspace() {
         onEvent: (event) => {
           if (event.production_id !== productionId) return;
           setEvents((current) => [...current, event]);
+          // Named events change the persisted snapshot or its artifacts:
+          // re-read the backend instead of only appending to the feed.
+          if (
+            event.type === "production.updated" ||
+            event.type.startsWith("stage.") ||
+            event.type === "artifact.available" ||
+            event.type === "memory.updated"
+          ) {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.production(productionId),
+            });
+          }
         },
         onStatus: setStreamStatus,
         onSnapshotRequired: () => {

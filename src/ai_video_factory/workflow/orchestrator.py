@@ -13,7 +13,7 @@ from typing import Callable, Mapping
 from uuid import uuid4
 
 from ai_video_factory.profiles.context import build_memory_context, stage_settings_digest
-from ai_video_factory.profiles.models import Observation, StageName
+from ai_video_factory.profiles.models import MemoryContext, Observation, StageName
 from ai_video_factory.models import StageStatus
 from ai_video_factory.profiles.store import ProfileStore
 from ai_video_factory.run_store import RunStore
@@ -87,6 +87,7 @@ def run_production(
     learning_reviewer: Callable | None = None,
     candidate_evaluator: object | None = None,
     control: object | None = None,
+    invalidation_inputs: set[str] | None = None,
 ) -> ProductionResult:
     """Run the stages up to ``through``, reusing valid deliveries on resume."""
     if through not in STAGE_ORDER:
@@ -122,6 +123,19 @@ def run_production(
 
     _reconcile(state_dir, runs, store, resolved)
 
+    if invalidation_inputs:
+        affected = set(plan_invalidation(invalidation_inputs))
+        for stage in affected:
+            run_id = _load_json(run_ids_path).get(stage)
+            if run_id:
+                try:
+                    runs.invalidate_run(str(run_id), f"retrabalho: {sorted(invalidation_inputs)}")
+                except ValueError:
+                    pass
+            (state_dir / f"{stage}_result.json").unlink(missing_ok=True)
+            refs.pop(stage, None)
+        _write_json(refs_path, {name: ref.model_dump() for name, ref in refs.items()})
+
     if dry_run:
         return ProductionResult(
             production_id=resolved.production_id,
@@ -151,10 +165,20 @@ def run_production(
         runner = runners.get(stage)
         if runner is None:
             raise StageExecutionError(f"no runner configured for stage {stage}")
-        memory = build_memory_context(
-            store, snapshot, stage, resolved.topic,
-            exclude_production_id=resolved.production_id,
-        )
+        # The applicable memory context is fixed on first execution of this
+        # production. Later observations or profile revisions must not change
+        # the fingerprint of work already delivered.
+        memory_path = state_dir / f"memory_{stage}.json"
+        if resume and memory_path.is_file():
+            memory = MemoryContext.model_validate(
+                json.loads(memory_path.read_text(encoding="utf-8"))
+            )
+        else:
+            memory = build_memory_context(
+                store, snapshot, stage, resolved.topic,
+                exclude_production_id=resolved.production_id,
+            )
+            memory_path.write_text(memory.model_dump_json(indent=2), encoding="utf-8")
         artifact_dir = artifacts_root / f"{STAGE_ORDER.index(stage) + 1:02d}_{stage}"
         artifact_dir.mkdir(parents=True, exist_ok=True)
         context = StageContext(
@@ -176,7 +200,6 @@ def run_production(
             "target_minutes": resolved.target_minutes,
             "seed_source_urls": list(resolved.seed_source_urls),
             "profile_id": resolved.profile_id,
-            "profile_revision": snapshot.revision,
             "stage_settings_digest": stage_settings_digest(snapshot, stage),
             "memory_digest": memory.digest,
             "tools": resolved.tools,

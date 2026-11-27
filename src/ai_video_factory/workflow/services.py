@@ -147,4 +147,5 @@ def execute_production_job(
         control=control,
         learning_reviewer=services.learning_reviewer,
         candidate_evaluator=services.evaluator,
+        invalidation_inputs=set(payload.get("invalidation_inputs") or ()),
     )

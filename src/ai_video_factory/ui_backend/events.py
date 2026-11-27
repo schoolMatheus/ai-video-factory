@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import inspect
-import json
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 from ai_video_factory.ui_backend.control_store import ControlStore
+from ai_video_factory.ui_backend.cursors import decode_cursor, encode_cursor
 from ai_video_factory.ui_backend.models import ConflictError, EventView
 from ai_video_factory.ui_backend.read_models import ProductionReadModels
 
@@ -30,18 +29,13 @@ class EventService:
     # -- cursors -----------------------------------------------------------
 
     def _encode_cursor(self, production_id: str, generation: str, event_id: str) -> str:
-        payload = {"p": production_id, "g": generation, "i": event_id}
-        raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+        return encode_cursor({"k": "event", "p": production_id, "g": generation, "i": event_id})
 
     def _decode_cursor(self, production_id: str, cursor: str) -> str:
         try:
-            padded = cursor + "=" * (-len(cursor) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
-            if not isinstance(payload, dict):
-                raise ValueError("cursor payload is not an object")
-            if payload.get("p") != production_id:
-                raise ValueError("cursor belongs to another production")
+            payload = decode_cursor(cursor)
+            if payload.get("k") != "event" or payload.get("p") != production_id:
+                raise ValueError("cursor belongs to another production or stream")
             event_id = str(payload["i"])
             generation = str(payload["g"])
         except (ValueError, KeyError, TypeError) as error:

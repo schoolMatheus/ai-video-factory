@@ -40,7 +40,10 @@ from ai_video_factory.ui_backend.models import (
 )
 from ai_video_factory.ui_backend.artifacts import ArtifactService
 from ai_video_factory.ui_backend.events import EventService
-from ai_video_factory.ui_backend.read_models import ProductionReadModels
+from ai_video_factory.ui_backend.read_models import (
+    ProductionReadModels,
+    StagedProductionReadModels,
+)
 from ai_video_factory.sanitization import sanitize_diagnostic
 from ai_video_factory.ui_backend.session import (
     CSRF_COOKIE,
@@ -245,6 +248,15 @@ def production(production_id: str, request: Request) -> ProductionView:
         submission = job_service.store.staged_production(production_id)
         if submission is None:
             raise
+        settings = request.app.state.settings
+        data_root = settings.data_root or settings.project_root / "data"
+        project = (
+            data_root / "projects"
+            / str(submission.get("profile_id") or "")
+            / production_id
+        )
+        if (project / "production.json").is_file():
+            return StagedProductionReadModels(project).get_production(production_id)
         job = None
         try:
             job = job_service.get_job(str(submission["job_id"]))
@@ -360,8 +372,12 @@ def events(
     request: Request,
     after_cursor: str | None = None,
 ) -> EventPage:
-    items = events_of(request).replay(production_id, after_cursor)
-    return EventPage(items=items, next_cursor=items[-1].id if items else None)
+    service = events_of(request)
+    items = service.replay(production_id, after_cursor)
+    next_cursor = (
+        service.cursor_for_event(production_id, items[-1].id) if items else None
+    )
+    return EventPage(items=items, next_cursor=next_cursor)
 
 
 @router.get("/productions/{production_id}/stream")

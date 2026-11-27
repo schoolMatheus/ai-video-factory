@@ -9,6 +9,18 @@ export interface StreamHandlers {
   onSnapshotRequired?: () => void;
 }
 
+const NAMED_EVENTS = [
+  "production.updated",
+  "stage.started",
+  "stage.progress",
+  "stage.completed",
+  "stage.failed",
+  "artifact.available",
+  "memory.updated",
+  "job.updated",
+  "connection.reset_required",
+] as const;
+
 /** Read-only SSE subscription that resumes from the last received event id. */
 export class ProductionEventStream {
   private source: EventSource | null = null;
@@ -19,7 +31,7 @@ export class ProductionEventStream {
   constructor(
     private readonly productionId: string,
     private readonly handlers: StreamHandlers,
-    private readonly cursor: string | null,
+    private readonly snapshotCursor: string | null,
   ) {}
 
   connect(): void {
@@ -37,8 +49,13 @@ export class ProductionEventStream {
       this.handlers.onStatus("live");
     };
     source.onmessage = (message: MessageEvent<string>) => {
-      this.accept(message);
+      this.accept("production.updated", message);
     };
+    for (const type of NAMED_EVENTS) {
+      source.addEventListener(type, ((message: MessageEvent<string>) => {
+        this.accept(type, message);
+      }) as EventListener);
+    }
     source.addEventListener("heartbeat", () => {
       // A heartbeat keeps the connection alive; it is not production progress.
     });
@@ -46,27 +63,30 @@ export class ProductionEventStream {
       source.close();
       if (!this.closed) this.scheduleReconnect();
     });
-    source.addEventListener("connection.reset_required", () => {
-      this.handlers.onSnapshotRequired?.();
-    });
     source.onerror = () => {
       source.close();
       if (!this.closed) this.scheduleReconnect();
     };
   }
 
-  private accept(message: MessageEvent<string>): void {
+  private accept(type: string, message: MessageEvent<string>): void {
     if (message.lastEventId) this.lastEventId = message.lastEventId;
     try {
       const parsed = JSON.parse(message.data) as Record<string, unknown>;
+      const timestamp = typeof parsed.timestamp === "string" ? parsed.timestamp : null;
+      const severity =
+        parsed.severity === "warning" || parsed.severity === "error"
+          ? parsed.severity
+          : "info";
+      const attempt = typeof parsed.attempt === "number" ? parsed.attempt : null;
       const event: EventView = {
         id: message.lastEventId || this.lastEventId || "stream-event",
         production_id: this.productionId,
-        type: "production.updated",
-        timestamp: null,
-        scope: "production",
-        severity: "info",
-        attempt: null,
+        type: type === "message" ? "production.updated" : type,
+        timestamp,
+        scope: typeof parsed.scope === "string" ? parsed.scope : "production",
+        severity,
+        attempt,
         payload: parsed,
       };
       this.handlers.onEvent(event);
@@ -82,12 +102,15 @@ export class ProductionEventStream {
       this.handlers.onSnapshotRequired?.();
       return;
     }
-    window.setTimeout(() => this.connect(), Math.min(500 * 2 ** this.retry, 4000));
+    window.setTimeout(
+      () => this.connect(),
+      Math.min(500 * 2 ** this.retry, 4000),
+    );
   }
 
-  /** Resume token: server-side cursor for the snapshot, last id after connect. */
+  /** Resume token: snapshot cursor until the first event, then the SSE id. */
   resumeCursor(): string | null {
-    return this.lastEventId ?? this.cursor;
+    return this.lastEventId ?? this.snapshotCursor;
   }
 
   close(): void {
