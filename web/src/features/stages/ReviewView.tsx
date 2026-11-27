@@ -4,7 +4,15 @@ export interface ReviewCheck {
   passed: boolean | null;
 }
 
-export function ReviewView({ checks }: { checks?: ReviewCheck[] }) {
+export function ReviewView({
+  checks,
+  bundle,
+}: {
+  checks?: ReviewCheck[];
+  bundle?: Record<string, unknown> | null;
+}) {
+  const packagePath = typeof bundle?.package_path === "string" ? bundle.package_path : null;
+  const failures = Array.isArray(bundle?.failures) ? bundle.failures : [];
   return (
     <section aria-label="Revisão">
       <h3>Verificações e pacote</h3>
@@ -14,7 +22,14 @@ export function ReviewView({ checks }: { checks?: ReviewCheck[] }) {
           {check.name}: {check.measured ? (check.passed ? "passou" : "falhou") : "não medido"}
         </p>
       ))}
-      <p>Pacote para publicação ainda não gerado. Nenhum upload é feito automaticamente.</p>
+      {failures.map((failure, index) => (
+        <p key={index}>Falha: {String(failure)}</p>
+      ))}
+      {packagePath ? (
+        <p>Pacote registrado: {packagePath}. Nenhum upload é feito automaticamente.</p>
+      ) : (
+        <p>Pacote para publicação ainda não gerado. Nenhum upload é feito automaticamente.</p>
+      )}
     </section>
   );
 }

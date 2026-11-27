@@ -92,6 +92,31 @@ export function getProduction(id: string): Promise<ProductionView> {
   return request<ProductionView>("GET", `/productions/${encodeURIComponent(id)}`);
 }
 
+export type StageBundle = Record<string, unknown>;
+
+export function getStageBundle(id: string, stage: string): Promise<StageBundle> {
+  return request<StageBundle>(
+    "GET",
+    `/productions/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/bundle`,
+  );
+}
+
+export function requestProductionAction(
+  id: string,
+  action: string,
+  payload: Record<string, unknown> = {},
+  idempotencyKey?: string,
+): Promise<OperationReceipt> {
+  return request<OperationReceipt>(
+    "POST",
+    `/productions/${encodeURIComponent(id)}/actions`,
+    {
+      body: { action, payload },
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+    },
+  );
+}
+
 export function listEvents(
   id: string,
   afterCursor?: string,

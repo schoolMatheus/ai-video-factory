@@ -265,6 +265,18 @@ def production(production_id: str, request: Request) -> ProductionView:
         return _staged_view(submission, job)
 
 
+@router.get("/productions/{production_id}/stages/{stage}/bundle")
+def stage_bundle(production_id: str, stage: StageName, request: Request) -> dict[str, object]:
+    """The actual persisted delivery bundle, resolved by production and stage."""
+    submission = jobs_of(request).store.staged_production(production_id)
+    if submission is None:
+        raise NotFoundError("Produção staged não encontrada.")
+    settings = request.app.state.settings
+    data_root = settings.data_root or settings.project_root / "data"
+    project = data_root / "projects" / str(submission.get("profile_id") or "") / production_id
+    return StagedProductionReadModels(project).get_bundle(production_id, stage.value)
+
+
 @router.get("/productions/{production_id}/stages/{stage}", response_model=StageView)
 def stage(production_id: str, stage: StageName, request: Request) -> StageView:
     _, _, models = services_of(request)

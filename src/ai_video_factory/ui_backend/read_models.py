@@ -16,7 +16,7 @@ from typing import Any
 
 from ai_video_factory.models import ArtifactIntegrity, RunManifest, StageStatus
 from ai_video_factory.run_store import RunStore
-from ai_video_factory.workflow.models import STAGE_ORDER
+from ai_video_factory.workflow.models import STAGE_ORDER, ArtifactRef
 from ai_video_factory.ui_backend.models import (
     ActionAvailability,
     ArtifactView,
@@ -487,6 +487,20 @@ class StagedProductionReadModels:
             started_at=request.get("created_at"),
             updated_at=str(snapshot.get("revision")) if revision else None,
         )
+
+    def get_bundle(self, production_id: str, stage: str) -> dict[str, Any]:
+        """Return the persisted delivery bundle for one stage, when it exists."""
+        self.get_production(production_id)
+        state_dir = self.root / "state"
+        result_path = state_dir / f"{stage}_result.json"
+        if not result_path.is_file():
+            raise NotFoundError("Entrega de estágio ainda não disponível.")
+        result = self._json(result_path)
+        ref = result.get("artifacts", {}).get("bundle")
+        if ref is None:
+            raise NotFoundError("Bundle do estágio não registrado.")
+        path = ArtifactRef.model_validate(ref).resolve(self.root)
+        return self._json(path)
 
     def list_events(self, production_id: str) -> list[EventView]:
         """Project RunStore events as typed, replayable UI events."""

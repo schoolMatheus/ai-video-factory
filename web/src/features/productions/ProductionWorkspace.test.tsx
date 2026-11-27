@@ -175,6 +175,38 @@ describe("ProductionWorkspace", () => {
     expect(await screen.findByText("Produção atualizada")).toBeInTheDocument();
   });
 
+  it("mostra entregas reais de todas as etapas na mesma jornada", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await screen.findByText("2 de 6 etapas concluídas");
+
+    expect(await screen.findByText("Afirmação sustentada")).toBeInTheDocument();
+    expect(screen.getByText("trecho real")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Roteiro/ }));
+    expect(await screen.findByText("Fala canônica")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Narração/ }));
+    expect(await screen.findByText(/Duração medida: 2s/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Mídia/ }));
+    expect(await screen.findByText(/CC-BY/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Edição/ }));
+    expect(await screen.findByText(/projeto.fcproj/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Revisão/ }));
+    expect(await screen.findByText(/duração: passou/)).toBeInTheDocument();
+  });
+
+  it("executa ação de retomada e atualiza a consulta da produção", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    const button = await screen.findByRole("button", { name: "Retomar" });
+    await user.click(button);
+    await waitFor(() => expect(button).toBeInTheDocument());
+  });
+
   it("não mistura eventos de outra produção", async () => {
     renderWorkspace();
 

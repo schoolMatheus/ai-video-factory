@@ -201,6 +201,15 @@ def test_event_arriving_between_snapshot_and_subscribe_is_replayed_once(tmp_path
     assert asyncio.run(collect()) == ["late-event"]
 
 
+def test_persisted_bundle_is_resolved_by_production_and_stage(tmp_path: Path) -> None:
+    result = _run(tmp_path)
+    models = StagedProductionReadModels(Path(result.project_dir))
+
+    for stage in STAGE_ORDER:
+        bundle = models.get_bundle(result.production_id, str(stage))
+        assert bundle["schema_version"] == 1
+
+
 def test_profile_revision_does_not_change_stage_reuse_fingerprint(tmp_path: Path) -> None:
     store = _store(tmp_path)
     first_runner = _Runner()
