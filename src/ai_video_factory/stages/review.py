@@ -17,6 +17,7 @@ from ai_video_factory.workflow.models import (
     ReviewCheck,
     Reroute,
     StageResult,
+    StructuredError,
 )
 
 Probe = Callable[[Path], dict[str, Any]]
@@ -133,7 +134,10 @@ class ReviewStage:
 
         package_path: Path | None = None
         if not failures and master_path is not None:
-            package_root = context.project_dir / "package"
+            # The package is a delivery of this stage: it must live inside the
+            # RunStore integrity root (<production>/artifacts), never at the
+            # production root where containment checks reject it after the run.
+            package_root = context.artifacts_dir / "package"
             package = self.packager(
                 package_root,
                 master_mp4=master_path,
@@ -170,6 +174,7 @@ class ReviewStage:
             )
         return StageResult(
             stage=context.stage,
+            status="failed" if bundle.status == "failed" else "completed",
             attempt=context.attempt,
             artifacts=artifacts,
             observations=[ObservationSeed(
@@ -178,6 +183,14 @@ class ReviewStage:
                 event_key=f"{context.request.production_id}:review:result",
             )],
             effective_config=dict(context.effective_settings),
+            error=StructuredError(
+                code="review_failed",
+                message="; ".join(failures) or "revisão reprovada",
+                details={
+                    "bundle_status": bundle.status,
+                    "reroutes": [route.model_dump() for route in reroutes],
+                },
+            ) if bundle.status == "failed" else None,
         )
 
 

@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from ai_video_factory.profiles.context import build_memory_context, stage_settings_digest
 from ai_video_factory.profiles.models import Observation, StageName
+from ai_video_factory.models import StageStatus
 from ai_video_factory.profiles.store import ProfileStore
 from ai_video_factory.run_store import RunStore
 from ai_video_factory.workflow.contracts import StageContext, StageRunner
@@ -223,22 +224,47 @@ def run_production(
             )
             return _failed_result(resolved, stage, results, all_artifacts, failure)
 
-        expected = {
-            key: ref.resolve(project_dir) for key, ref in result.artifacts.items()
-        }
-        if "bundle" not in expected:
-            raise StageExecutionError(f"stage {stage} did not declare a bundle artifact")
-        runs.complete(manifest.run_id, {key: str(path) for key, path in expected.items()},
-                      expected_artifacts=expected)
-        _record_observations(
-            store, resolved, stage, manifest.run_id,
-            [seed.model_dump() for seed in result.observations],
-            context.effective_settings, context.tool_versions,
-        )
-        result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        # Persistence and integrity checks happen after the runner returns. A
+        # failure here must become a structured production result, never an
+        # unhandled exception that hides what the stage actually delivered.
+        try:
+            expected = {
+                key: ref.resolve(project_dir) for key, ref in result.artifacts.items()
+            }
+            if "bundle" not in expected:
+                raise StageExecutionError(f"stage {stage} did not declare a bundle artifact")
+            runs.complete(manifest.run_id, {key: str(path) for key, path in expected.items()},
+                          expected_artifacts=expected)
+            _record_observations(
+                store, resolved, stage, manifest.run_id,
+                [seed.model_dump() for seed in result.observations],
+                context.effective_settings, context.tool_versions,
+            )
+            result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        except Exception as error:  # noqa: BLE001 - boundary: persist, then report
+            failure = StructuredError(
+                code=type(error).__name__, message=str(error),
+                details={"stage": stage, "phase": "after_runner"},
+            )
+            if runs._load_run(manifest.run_id).status is StageStatus.running:
+                runs.fail(manifest.run_id, failure.message)
+            return _failed_result(resolved, stage, results, all_artifacts, failure)
+
         results[stage] = result
         for key, ref in result.artifacts.items():
             all_artifacts[f"{stage}.{key}"] = ref
+
+        if result.status != "completed":
+            failure = result.error or StructuredError(
+                code="stage_rejected",
+                message=f"stage {stage} ended with status {result.status}",
+                details={"stage": stage},
+            )
+            # The bundle and diagnostics are already persisted with integrity;
+            # mark the run failed so resume cannot reuse a rejected delivery.
+            runs.invalidate_completed(manifest.run_id, inputs_payload, failure.message)
+            return _failed_result(resolved, stage, results, all_artifacts, failure)
+
         refs[stage] = result.artifacts["bundle"]
         _write_json(refs_path, {name: ref.model_dump() for name, ref in refs.items()})
 
@@ -251,7 +277,9 @@ def run_production(
             )
 
     review = results.get("review")
-    package_path = review.artifacts.get("package") if review else None
+    package_ref = review.artifacts.get("package") if review else None
+    # The registered artifact is the manifest; the deliverable is its directory.
+    package_dir = package_ref.resolve(project_dir).parent if package_ref else None
     return ProductionResult(
         production_id=resolved.production_id,
         profile_id=resolved.profile_id,
@@ -259,7 +287,7 @@ def run_production(
         final_stage=through,
         project_dir=str(project_dir),
         artifacts=all_artifacts,
-        package_path=str(package_path.resolve(project_dir)) if package_path else None,
+        package_path=str(package_dir) if package_dir else None,
         learning_revision_ids=learning_ids,
     )
 
