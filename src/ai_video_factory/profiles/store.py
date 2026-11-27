@@ -318,8 +318,8 @@ class ProfileStore:
             ),
         )
         connection.execute(
-            "UPDATE profiles SET current_revision = ? WHERE profile_id = ?",
-            (snapshot.revision, snapshot.profile_id),
+            "UPDATE profiles SET current_revision = ?, name = ? WHERE profile_id = ?",
+            (snapshot.revision, snapshot.name, snapshot.profile_id),
         )
         connection.execute(
             "INSERT INTO memory_events (profile_id, kind, ref_id, detail_json, created_at) "
@@ -872,6 +872,7 @@ class ProfileStore:
         return ProfileSnapshot(
             profile_id=snapshot.profile_id,
             revision=revision,
+            name=snapshot.name,
             settings=payload["settings"],
             explicit_fields=list(snapshot.explicit_fields),
             active_learning_ids=list(active_ids),

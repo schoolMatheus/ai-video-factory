@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getProfile, listProfiles } from "../../api/client";
 import { queryKeys } from "../../api/queryKeys";
@@ -7,10 +7,11 @@ import { ProfileForm } from "./ProfileForm";
 import styles from "./ProfileList.module.css";
 
 export function ProfileList() {
+  const queryClient = useQueryClient();
   const list = useQuery({ queryKey: queryKeys.profiles(), queryFn: listProfiles, retry: false });
   const selectedId = new URLSearchParams(window.location.search).get("perfil");
   const selected = useQuery({
-    queryKey: ["profile", selectedId],
+    queryKey: queryKeys.profile(selectedId ?? ""),
     queryFn: () => getProfile(selectedId ?? ""),
     enabled: Boolean(selectedId),
     retry: false,
@@ -53,7 +54,18 @@ export function ProfileList() {
       {list.isSuccess && list.data.items.length === 0 && (
         <p>Nenhum perfil cadastrado neste ambiente.</p>
       )}
-      {selected.data && <ProfileForm profile={selected.data} />}
+      {selected.data && (
+        <ProfileForm
+          key={selected.data.id}
+          profile={selected.data}
+          onSaved={() => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.profiles() });
+            if (selectedId) {
+              void queryClient.invalidateQueries({ queryKey: queryKeys.profile(selectedId) });
+            }
+          }}
+        />
+      )}
       {!selectedId && <ProfileForm />}
     </section>
   );

@@ -159,6 +159,9 @@ class ProfilePatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
+    name: str = ""
+    language: str = ""
+    niche: str = ""
     settings: dict[str, Any] = Field(default_factory=dict)
     explicit_fields: list[str] | None = None
     reason: str = "Alteração pelo painel local"
@@ -259,6 +262,7 @@ class ProfileView(BaseModel):
 
     id: str
     name: str
+    language: str = ""
     niche: str = ""
     revision: int
     settings: dict[str, Any] = Field(default_factory=dict)

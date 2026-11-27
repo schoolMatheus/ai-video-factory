@@ -15,5 +15,6 @@ export const queryKeys = {
   events: (productionId: string) => ["events", productionId] as const,
   artifacts: (productionId: string) => ["artifacts", productionId] as const,
   profiles: () => ["profiles"] as const,
+  profile: (profileId: string) => ["profile", profileId] as const,
   memory: (profileId: string) => ["memory", profileId] as const,
 };

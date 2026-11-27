@@ -7,13 +7,33 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from ai_video_factory.ui_backend.models import (
+    ConflictError,
     FeedbackRequest,
     MemoryView,
+    NotFoundError,
     ProfileCreateRequest,
     ProfilePatchRequest,
     ProfileView,
     StageName,
 )
+
+
+def _translate(call: Any) -> Any:
+    """Domain errors become typed HTTP errors at the adapter boundary."""
+    from ai_video_factory.profiles.store import (
+        NotFound as DomainNotFound,
+        RevisionConflict,
+        ScopeViolation,
+    )
+
+    try:
+        return call()
+    except DomainNotFound as error:
+        raise NotFoundError(str(error)) from error
+    except ScopeViolation as error:
+        raise NotFoundError(str(error)) from error
+    except RevisionConflict as error:
+        raise ConflictError(str(error)) from error
 
 
 class ProfileAdapter(Protocol):
@@ -46,7 +66,7 @@ class DomainProfileAdapter:
         return [_profile_view(snapshot) for snapshot in self.store.list_profiles()]
 
     def get_profile(self, profile_id: str) -> ProfileView:
-        return _profile_view(self.store.get_snapshot(profile_id))
+        return _translate(lambda: _profile_view(self.store.get_snapshot(profile_id)))
 
     def create_profile(self, payload: ProfileCreateRequest) -> ProfileView:
         from ai_video_factory.profiles.models import ProfileSpec
@@ -57,27 +77,31 @@ class DomainProfileAdapter:
             language=payload.language,
             niche=payload.niche,
             explicit_fields=payload.explicit_fields,
+            settings={"language": payload.language, "niche": payload.niche},
         )
-        return _profile_view(self.store.create_profile(spec))
+        return _translate(lambda: _profile_view(self.store.create_profile(spec)))
 
     def revise_profile(self, profile_id: str, payload: ProfilePatchRequest) -> ProfileView:
         from ai_video_factory.profiles.models import ProfilePatch
 
         patch = ProfilePatch(
+            name=payload.name,
+            language=payload.language,
+            niche=payload.niche,
             settings=payload.settings,
             explicit_fields=payload.explicit_fields or [],
         )
-        return _profile_view(
+        return _translate(lambda: _profile_view(
             self.store.revise_profile(
                 profile_id,
                 patch,
                 expected_revision=payload.expected_revision,
                 reason=payload.reason,
             )
-        )
+        ))
 
     def list_memory(self, profile_id: str) -> list[MemoryView]:
-        self.store.get_snapshot(profile_id)
+        snapshot = _translate(lambda: self.store.get_snapshot(profile_id))
         items: list[MemoryView] = []
         for learning in self.store.list_learnings(profile_id):
             items.append(
@@ -86,12 +110,30 @@ class DomainProfileAdapter:
                     profile_id=profile_id,
                     stage=_stage(learning.action),
                     state=learning.state,
-                    summary=str(learning.action),
+                    summary=f"{learning.action.path} = {learning.action.value!r}",
                     origin="inferred",
+                    condition=learning.condition,
                     evidence=list(learning.evidence_ids),
-                    revision=1,
+                    before=None,
+                    after=str(learning.action.value),
+                    revision=snapshot.revision,
+                    updated_at=learning.activated_at,
                 )
             )
+        for candidate in self.store.list_candidates(profile_id):
+            items.append(MemoryView(
+                id=candidate.candidate_id,
+                profile_id=profile_id,
+                stage=candidate.stage,
+                state=candidate.state,
+                summary=f"hipótese: {candidate.change.path} = {candidate.change.value!r}",
+                origin="inferred",
+                condition=candidate.condition,
+                evidence=list(candidate.evidence_ids),
+                after=str(candidate.change.value),
+                revision=snapshot.revision,
+                updated_at=candidate.created_at,
+            ))
         for observation in self.store.list_observations(profile_id):
             items.append(
                 MemoryView(
@@ -102,6 +144,8 @@ class DomainProfileAdapter:
                     summary=observation.summary,
                     origin="observed",
                     evidence=list(observation.evidence_refs),
+                    revision=snapshot.revision,
+                    updated_at=observation.created_at,
                 )
             )
         return items
@@ -139,22 +183,25 @@ class DomainProfileAdapter:
     def suspend_learning(
         self, profile_id: str, learning_id: str, expected_revision: int, reason: str
     ) -> MemoryView:
-        self.store.suspend_learning(
+        revised = _translate(lambda: self.store.suspend_learning(
             profile_id, learning_id, expected_revision=expected_revision, reason=reason
-        )
+        ))
         return MemoryView(
             id=learning_id,
             profile_id=profile_id,
             state="suspended",
             summary=f"Suspenso: {reason}",
             origin="inferred",
+            revision=revised.revision,
+            updated_at=revised.created_at,
         )
 
 
 def _profile_view(snapshot: Any) -> ProfileView:
     return ProfileView(
         id=snapshot.profile_id,
-        name=getattr(snapshot, "name", snapshot.profile_id),
+        name=getattr(snapshot, "name", "") or snapshot.profile_id,
+        language=getattr(snapshot, "language", ""),
         niche=getattr(snapshot, "niche", ""),
         revision=snapshot.revision,
         settings=dict(getattr(snapshot, "settings", {})),

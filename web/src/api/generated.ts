@@ -707,6 +707,21 @@ export interface components {
             /** Explicit Fields */
             explicit_fields?: string[] | null;
             /**
+             * Language
+             * @default
+             */
+            language: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Niche
+             * @default
+             */
+            niche: string;
+            /**
              * Reason
              * @default Alteração pelo painel local
              */
@@ -727,6 +742,11 @@ export interface components {
             explicit_fields?: string[];
             /** Id */
             id: string;
+            /**
+             * Language
+             * @default
+             */
+            language: string;
             /** Name */
             name: string;
             /**
@@ -1041,7 +1061,9 @@ export interface operations {
     action_api_v1_productions__production_id__actions_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 production_id: string;
             };
