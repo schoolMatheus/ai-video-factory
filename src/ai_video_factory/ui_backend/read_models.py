@@ -402,6 +402,8 @@ class StagedProductionReadModels:
 
     def __init__(self, project_root: Path) -> None:
         self.root = Path(project_root)
+        self.state_root = self.root / "state"
+        self.artifact_root = (self.root / "artifacts").resolve()
 
     def _json(self, path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -488,6 +490,50 @@ class StagedProductionReadModels:
             started_at=request.get("created_at"),
             updated_at=str(snapshot.get("revision")) if revision else None,
         )
+
+    def find_artifact(
+        self, artifact_id: str
+    ) -> tuple[str, str, ArtifactIntegrity] | None:
+        state_dir = self.root / "state"
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        store = RunStore(state_dir, artifact_root=self.artifact_root)
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            try:
+                manifest = store._load_run(str(run_id))
+            except Exception:  # noqa: BLE001 - damaged run is not an artifact
+                continue
+            for key, record in manifest.artifact_integrity.items():
+                if ProductionReadModels._artifact_id(manifest.run_id, key) == artifact_id:
+                    return manifest.run_id, key, record
+        return None
+
+    def list_artifacts(self, production_id: str) -> list[ArtifactView]:
+        state_dir = self.root / "state"
+        run_ids = self._json(state_dir / "run_ids.json") if (state_dir / "run_ids.json").is_file() else {}
+        store = RunStore(state_dir, artifact_root=self.artifact_root)
+        artifacts: list[ArtifactView] = []
+        for stage in STAGE_ORDER:
+            run_id = run_ids.get(stage)
+            if not run_id:
+                continue
+            try:
+                manifest = store._load_run(str(run_id))
+            except Exception:  # noqa: BLE001
+                continue
+            for key, record in manifest.artifact_integrity.items():
+                artifacts.append(ArtifactView(
+                    id=ProductionReadModels._artifact_id(manifest.run_id, key),
+                    name=Path(record.path).name,
+                    media_type=_media_type(record.path),
+                    size_bytes=record.size_bytes,
+                    sha256=record.sha256,
+                    stage=StageName(stage),
+                    integrity="verified",
+                ))
+        return sorted(artifacts, key=lambda item: item.id)
 
     def get_bundle(self, production_id: str, stage: str) -> dict[str, Any]:
         """Return the persisted delivery bundle for one stage, when it exists."""

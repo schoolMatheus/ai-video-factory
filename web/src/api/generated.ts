@@ -178,6 +178,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/productions/{production_id}/stages/{stage}/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stage Bundle
+         * @description The actual persisted delivery bundle, resolved by production and stage.
+         */
+        get: operations["stage_bundle_api_v1_productions__production_id__stages__stage__bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/productions/{production_id}/stream": {
         parameters: {
             query?: never;
@@ -626,6 +646,8 @@ export interface components {
             angle?: string | null;
             /** Profile Id */
             profile_id?: string | null;
+            /** Profile Revision */
+            profile_revision?: number | null;
             /** Seed Source Urls */
             seed_source_urls?: string[];
             /** Target Minutes */
@@ -1178,6 +1200,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StageView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stage_bundle_api_v1_productions__production_id__stages__stage__bundle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                production_id: string;
+                stage: components["schemas"]["StageName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

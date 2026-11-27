@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from ai_video_factory.ui_backend.models import (
     ConflictError,
     FeedbackRequest,
+    InvalidRequestError,
     MemoryView,
     NotFoundError,
     ProfileCreateRequest,
@@ -34,6 +35,8 @@ def _translate(call: Any) -> Any:
         raise NotFoundError(str(error)) from error
     except RevisionConflict as error:
         raise ConflictError(str(error)) from error
+    except ValueError as error:
+        raise InvalidRequestError(str(error)) from error
 
 
 class ProfileAdapter(Protocol):

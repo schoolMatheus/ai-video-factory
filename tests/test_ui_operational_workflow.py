@@ -241,6 +241,35 @@ def test_action_creates_a_real_queryable_job(
     assert http.get(f"/api/v1/jobs/{receipt['job_id']}").status_code == 200
 
 
+def test_action_job_keeps_the_original_request_and_pinned_revision(
+    factory: _ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(JobService, "_spawn", lambda self, job_id: None)
+    http = factory.client()
+    response = http.post(
+        "/api/v1/productions",
+        json={
+            "profile_id": "canal", "topic": "Tema", "target_minutes": 1 / 60,
+            "profile_revision": 4,
+        },
+        headers={"Idempotency-Key": "pinned-submit"},
+    )
+    assert response.status_code == 202, response.text
+    production = response.json()
+
+    action = http.post(
+        f"/api/v1/productions/{production['production_id']}/actions",
+        json={"action": "resume", "payload": {}},
+        headers={"Idempotency-Key": "pinned-action"},
+    )
+    assert action.status_code == 200, action.text
+    job = http.get(f"/api/v1/jobs/{action.json()['job_id']}").json()
+    stored = http.app.state.services.jobs.store.job(job["id"])
+    payload = json.loads(stored["payload"])
+    assert payload["request"]["target_minutes"] == 1 / 60
+    assert payload["request"]["profile_revision"] == 4
+
+
 def test_unavailable_action_fails_instead_of_faking_queued(
     factory: _ClientFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:

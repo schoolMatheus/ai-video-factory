@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   getProduction,
@@ -231,14 +231,13 @@ export function ProductionWorkspace() {
     retry: false,
   });
 
+  const actionKeys = useRef(new Map<string, string>());
   async function runAction(action: string, payload: Record<string, unknown> = {}) {
+    const identity = `${action}:${JSON.stringify(payload)}`;
+    const key = actionKeys.current.get(identity) ?? `${productionId}:${identity}`;
+    actionKeys.current.set(identity, key);
     try {
-      await requestProductionAction(
-        productionId,
-        action,
-        payload,
-        `${productionId}:${action}:${Date.now()}`,
-      );
+      await requestProductionAction(productionId, action, payload, key);
       await queryClient.invalidateQueries({ queryKey: queryKeys.production(productionId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.events(productionId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.bundle(productionId, selected) });

@@ -147,29 +147,37 @@ def default_script_generator() -> Any:
             source_url=source_url,
             duration_seconds=int(context.request.target_minutes * 60),
         )
-        text = str(result)
+        generated = result if isinstance(result, dict) else {}
+        drafts = generated.get("scenes")
+        drafts = drafts if isinstance(drafts, list) else []
         known = {claim.claim_id for claim in research.claims}
         scenes: list[Scene] = []
         for index, claim in enumerate(research.claims, start=1):
             scene_id = f"scene-{index:02d}"
             shot_id = f"{scene_id}-shot-1"
+            draft = drafts[index - 1] if index - 1 < len(drafts) else {}
+            draft = draft if isinstance(draft, dict) else {}
+            spoken = str(draft.get("narration") or claim.text).strip()
             qualification = (
                 "Fontes divergentes; apresentar como discussão, não como fato confirmado."
                 if claim.classification != "confirmed fact" or not claim.verified
                 else "Fato sustentado pelo dossiê."
             )
+            narration_text = f"{spoken} {qualification}"
             scenes.append(Scene(
                 scene_id=scene_id,
-                title=f"Capítulo {index}: {claim.text[:60]}",
-                narration_text=f"{claim.text}. {qualification}",
-                estimated_seconds=max(4.0, min(60.0, len(claim.text.split()) / 2.5)),
+                title=str(draft.get("title") or f"Capítulo {index}: {claim.text[:60]}"),
+                narration_text=narration_text,
+                estimated_seconds=max(4.0, min(60.0, len(narration_text.split()) / 2.5)),
                 shots=[Shot(
-                    shot_id=shot_id, visual=f"Plano editorial: {claim.text}",
+                    shot_id=shot_id,
+                    visual=str(draft.get("visual") or draft.get("caption")
+                               or f"Plano editorial: {claim.text}"),
                     intent=qualification, claim_refs=[claim.claim_id] if claim.claim_id in known else [],
                 )],
             ))
         return ScriptBundle(
-            title=context.topic or text[:80] or "Episódio",
+            title=str(generated.get("title") or context.topic or "Episódio"),
             logline=context.request.angle,
             language=context.language,
             chapters=[Chapter(chapter_id=f"chapter-{n:02d}", title=f"Capítulo {n}",

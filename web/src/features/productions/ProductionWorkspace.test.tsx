@@ -2,6 +2,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { API_PREFIX } from "../../api/types";
 import { App } from "../../app/App";
 import { Providers } from "../../app/providers";
 import { routes } from "../../app/router";
@@ -205,6 +207,27 @@ describe("ProductionWorkspace", () => {
     const button = await screen.findByRole("button", { name: "Retomar" });
     await user.click(button);
     await waitFor(() => expect(button).toBeInTheDocument());
+  });
+
+  it("reusa a mesma chave em dois cliques rápidos de retomada", async () => {
+    const keys: (string | null)[] = [];
+    server.use(
+      http.post(`${API_PREFIX}/productions/:id/actions`, ({ request }) => {
+        keys.push(request.headers.get("Idempotency-Key"));
+        return HttpResponse.json({
+          job_id: "job-1", production_id: "p".repeat(32), status: "queued",
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace();
+    const button = await screen.findByRole("button", { name: "Retomar" });
+
+    await Promise.all([user.click(button), user.click(button)]);
+    await waitFor(() => expect(keys.length).toBeGreaterThan(0));
+
+    expect(keys[0]).toBeTruthy();
+    expect(new Set(keys).size).toBe(1);
   });
 
   it("não mistura eventos de outra produção", async () => {

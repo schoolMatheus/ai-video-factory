@@ -111,6 +111,44 @@ def test_default_cli_research_discovers_fetches_and_persists_evidence(
     assert script["language"] == "pt-BR"
 
 
+def test_generated_editorial_text_reaches_the_script_bundle(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from ai_video_factory import script_generator
+
+    monkeypatch.setattr(workflow_cli, "open_store", lambda: _store(tmp_path))
+    monkeypatch.setattr(services, "default_research_transports", lambda: {
+        "source_discovery": lambda topic: [],
+        "transport": lambda url: "Texto longo o suficiente. A grows steadily in the material.",
+        "production_extractor": lambda topic, contents, *, identity=None: [
+            __import__("ai_video_factory.research_pipeline", fromlist=["Extraction"]).Extraction(
+                claim="Fato extraído do material", quote="A grows steadily",
+                classification="confirmed fact",
+            )
+        ],
+    })
+    monkeypatch.setattr(script_generator, "generate_script_with_lm_studio", lambda **kwargs: {
+        "title": "Título gerado pelo modelo",
+        "narration": "Narração completa gerada pelo modelo.",
+        "scenes": [{
+            "title": "Cena gerada", "narration": "Fala escrita pelo modelo sobre o tema.",
+            "visual": "Plano escrito pelo modelo",
+        }],
+    })
+
+    result = _invoke(tmp_path, "--seed-source-url", "https://a.example/a")
+
+    assert result.exit_code == 0, result.output
+    script = json.loads(
+        (tmp_path / "projects" / "canal" / "wire-prod" / "artifacts" / "02_script"
+         / "script_bundle.json").read_text(encoding="utf-8")
+    )
+    assert script["title"] == "Título gerado pelo modelo"
+    assert any("Fala escrita pelo modelo" in scene["narration_text"] for scene in script["scenes"])
+    assert any("Plano escrito pelo modelo" in shot["visual"]
+               for scene in script["scenes"] for shot in scene["shots"])
+
+
 def test_without_material_research_fails_explicitly(
     tmp_path: Path, monkeypatch: Any
 ) -> None:

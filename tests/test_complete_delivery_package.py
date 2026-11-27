@@ -75,6 +75,10 @@ def _inputs(
                  "source_url": "https://a.example"}],
         gaps=gaps,
     )
+    project_file = context.artifacts_dir / "project.fcproj"
+    project_file.write_text(json.dumps({
+        "editable": True, "production": context.request.production_id,
+    }), encoding="utf-8")
     previews: list[ArtifactRef] = []
     if composition:
         preview = context.artifacts_dir / "preview.mp4"
@@ -150,6 +154,12 @@ def test_approved_package_contains_all_deliverables_and_is_portable(tmp_path: Pa
         assert (package / name).is_file(), name
     approval = json.loads((package / "approval.json").read_text(encoding="utf-8"))
     assert approval["status"] == "pending"
+    project = json.loads((package / "filmcraft_project.fcproj").read_text(encoding="utf-8"))
+    assert project["editable"] is True
+    assert project["production"] == "prod-qc"
+    srt = (package / "captions.srt").read_text(encoding="utf-8")
+    assert "00:00:00,000 --> 00:00:01,000" in srt
+    assert "Fala canônica." in srt
 
     relocated = tmp_path / "restored" / "package"
     shutil.copytree(package, relocated)

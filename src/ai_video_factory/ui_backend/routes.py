@@ -188,6 +188,7 @@ def create_production(
         "topic": payload.topic,
         "angle": payload.angle or "",
         "target_minutes": payload.target_minutes or 25.0,
+        "profile_revision": payload.profile_revision,
         "seed_source_urls": list(payload.seed_source_urls),
         "base_dir": str(data_root / "projects"),
     }
@@ -305,7 +306,28 @@ def artifacts_of(request: Request) -> ArtifactService:
 @router.get("/productions/{production_id}/artifacts", response_model=list[ArtifactView])
 def artifacts(production_id: str, request: Request) -> list[ArtifactView]:
     _, _, models = services_of(request)
-    return models.list_artifacts(production_id)
+    try:
+        return models.list_artifacts(production_id)
+    except NotFoundError:
+        staged = _staged_models_of(request, production_id)
+        if staged is None:
+            raise
+        return staged.list_artifacts(production_id)
+
+
+def _staged_models_of(request: Request, production_id: str):
+    submission = jobs_of(request).store.staged_production(production_id)
+    if submission is None:
+        return None
+    settings = request.app.state.settings
+    data_root = settings.data_root or settings.project_root / "data"
+    project = (
+        data_root / "projects" / str(submission.get("profile_id") or "")
+        / production_id
+    )
+    if not (project / "production.json").is_file():
+        return None
+    return StagedProductionReadModels(project)
 
 
 @router.get("/artifacts/{artifact_id}/content")
@@ -395,7 +417,7 @@ def events(
 @router.get("/productions/{production_id}/stream")
 async def stream(production_id: str, request: Request) -> StreamingResponse:
     event_service = events_of(request)
-    event_service.read_models.get_production(production_id)
+    # EventService resolves legacy or staged manifests from the cursor/snapshot.
     last_event_id = request.headers.get("last-event-id")
     cursor = (
         event_service.cursor_for_event(production_id, last_event_id)

@@ -93,6 +93,24 @@ def test_conflict_and_not_found_are_translated(tmp_path: Path) -> None:
     assert missing.status_code == 404
 
 
+def test_ambiguous_settings_are_rejected_as_an_actionable_422(tmp_path: Path) -> None:
+    http = _client(tmp_path)
+    http.post("/api/v1/profiles", json={
+        "profile_id": "canal-a", "name": "Canal A", "language": "pt-BR",
+    })
+
+    response = http.patch("/api/v1/profiles/canal-a", json={
+        "expected_revision": 1,
+        "settings": {
+            "narration.voice": "plana",
+            "narration": {"voice": "aninhada"},
+        },
+    })
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_request"
+
+
 def test_memory_reports_real_revision_candidates_and_trials(tmp_path: Path) -> None:
     http = _client(tmp_path)
     assert http.post("/api/v1/profiles", json={

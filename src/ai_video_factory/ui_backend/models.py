@@ -126,6 +126,7 @@ class ProductionCreateRequest(BaseModel):
     topic: str = Field(min_length=1)
     angle: str | None = None
     target_minutes: float | None = Field(default=None, ge=0.01, le=120)
+    profile_revision: int | None = Field(default=None, ge=1)
     seed_source_urls: list[str] = Field(default_factory=list)
 
 

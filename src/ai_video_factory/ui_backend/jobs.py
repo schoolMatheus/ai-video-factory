@@ -109,6 +109,8 @@ class JobService:
             "status": JobStatus.queued.value,
             "created_at": now,
             "updated_at": now,
+            "request_json": json.dumps(request, sort_keys=True, ensure_ascii=False),
+            "profile_revision": request.get("profile_revision"),
         }
         if not self.store.submit_transaction(idempotency_key, job, production, now):
             return self._receipt(self.store.idempotent_job_id(idempotency_key) or job_id)
@@ -404,7 +406,6 @@ class JobService:
                     return self._receipt(str(job["job_id"]))
             raise ConflictError("Nenhum job ativo nesta produção para receber parada.")
 
-        domain.execute_action(production_id, action)
         changed: set[str] = set()
         if action_name == "revise_script":
             changed = {"script.scene"}
@@ -419,19 +420,27 @@ class JobService:
         existing = self.store.idempotent_job_id(key)
         if existing is not None:
             return self._receipt(existing)
+        domain.execute_action(production_id, action)
+
+        stored_request = submission.get("request_json")
+        request_payload = json.loads(stored_request) if stored_request else {
+            "production_id": production_id,
+            "profile_id": submission.get("profile_id"),
+            "topic": submission.get("topic") or "retomada",
+            "target_minutes": 25.0,
+            "base_dir": str(self.store.db_path.parent.parent / "projects"),
+        }
+        # Rework keeps the production's pinned profile revision; a profile
+        # changed mid-production must not leak into the retrabalho.
+        if submission.get("profile_revision") is not None:
+            request_payload["profile_revision"] = int(submission["profile_revision"])
 
         job_id = uuid.uuid4().hex
         now = _now()
         payload = {
             "action": action_name,
             "production_id": production_id,
-            "request": {
-                "production_id": production_id,
-                "profile_id": submission.get("profile_id"),
-                "topic": submission.get("topic") or "retomada",
-                "target_minutes": 25.0,
-                "base_dir": str(self.store.db_path.parent.parent / "projects"),
-            },
+            "request": request_payload,
             "through": "review" if action_name != "open_editor" else "editing",
             "action_payload": action.payload,
             "invalidation_inputs": sorted(changed),

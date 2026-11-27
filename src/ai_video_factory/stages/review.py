@@ -165,7 +165,7 @@ class ReviewStage:
             # RunStore integrity root (<production>/artifacts), never at the
             # production root where containment checks reject it after the run.
             package_root = context.artifacts_dir / "package"
-            extras = _write_package_extras(context, script, research, media, editing, checks)
+            extras = _write_package_extras(context, script, research, narration, checks)
             package = self.packager(
                 package_root,
                 master_mp4=master_path,
@@ -253,8 +253,7 @@ def _write_package_extras(
     context: StageContext,
     script: Any,
     research: Any,
-    media: Any,
-    editing: Any,
+    narration: Any,
     checks: list[ReviewCheck],
 ) -> dict[str, Path]:
     """Create the deliverables the publish checklist requires."""
@@ -274,12 +273,35 @@ def _write_package_extras(
          "scene_ids": list(chapter.scene_ids)}
         for chapter in script.chapters
     ], ensure_ascii=False, indent=2), encoding="utf-8")
-    total = max(1.0, float(getattr(research, "synthesis", "") and 1.0))
     srt = directory / "captions.srt"
     vtt = directory / "captions.vtt"
-    text = str(getattr(script, "canonical_narration", "") or "").strip()
-    srt.write_text(f"1\n00:00:00,000 --> 00:00:{total:06.3f}".replace(".", ",") + f"\n{text}\n", encoding="utf-8")
-    vtt.write_text(f"WEBVTT\n\n00:00:00.000 --> 00:00:{total:06.3f}\n{text}\n", encoding="utf-8")
+    segments = list(getattr(narration, "segments", []) or [])
+    cues: list[tuple[float, float, str]] = [
+        (float(item.start_seconds), float(item.duration_seconds), str(item.text))
+        for item in segments
+    ] or [(0.0, max(1.0, float(getattr(narration, "total_duration_seconds", 0) or 1.0)),
+           str(getattr(script, "canonical_narration", "") or "").strip())]
+
+    def stamp(seconds: float, comma: bool) -> str:
+        minutes, rest = divmod(max(0.0, seconds), 60)
+        hours, minutes = divmod(int(minutes), 60)
+        text = f"{hours:02d}:{minutes:02d}:{rest:06.3f}"
+        return text.replace(".", ",") if comma else text
+
+    srt.write_text(
+        "\n\n".join(
+            f"{index}\n{stamp(start, True)} --> {stamp(start + duration, True)}\n{text}"
+            for index, (start, duration, text) in enumerate(cues, start=1)
+        ) + "\n",
+        encoding="utf-8",
+    )
+    vtt.write_text(
+        "WEBVTT\n\n" + "\n\n".join(
+            f"{stamp(start, False)} --> {stamp(start + duration, False)}\n{text}"
+            for start, duration, text in cues
+        ) + "\n",
+        encoding="utf-8",
+    )
     return {"thumbnail": thumbnail, "chapters": chapters, "srt": srt, "vtt": vtt}
 
 
@@ -304,11 +326,22 @@ def _copy_package_extras(
     (package_root / "sources.json").write_text(json.dumps(
         [item.model_dump() for item in media.rights], ensure_ascii=False, indent=2
     ), encoding="utf-8")
-    (package_root / "filmcraft_project.fcproj").write_text(json.dumps({
-        "project_path": editing.project_path,
-        "item_map": editing.item_map,
-        "production_id": context.request.production_id,
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    project_source = context.artifacts_dir / "project.fcproj"
+    if not project_source.is_file():
+        candidate = Path(editing.project_path)
+        if candidate.is_file():
+            project_source = candidate
+    if project_source.is_file():
+        (package_root / "filmcraft_project.fcproj").write_bytes(project_source.read_bytes())
+    else:
+        # An explicit stub is not an editable project: record that honestly.
+        (package_root / "filmcraft_project.fcproj").write_text(json.dumps({
+            "project_path": editing.project_path,
+            "item_map": editing.item_map,
+            "production_id": context.request.production_id,
+            "editable": False,
+            "note": "somente referência; projeto editável não estava disponível como arquivo",
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
     manifest_path = context.artifacts_dir / "media_manifest.json"
     if manifest_path.is_file():
         (package_root / "media_manifest.json").write_bytes(manifest_path.read_bytes())

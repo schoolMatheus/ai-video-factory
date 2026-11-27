@@ -91,6 +91,18 @@ class ControlStore:
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
             }
+            staged_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(staged_productions)").fetchall()
+            }
+            for name, declaration in (
+                ("request_json", "TEXT"),
+                ("profile_revision", "INTEGER"),
+            ):
+                if name not in staged_columns:
+                    connection.execute(
+                        f"ALTER TABLE staged_productions ADD COLUMN {name} {declaration}"
+                    )
             for name, declaration in (
                 ("payload", "TEXT NOT NULL DEFAULT '{}'"),
                 ("worker_token", "TEXT"),
@@ -151,6 +163,11 @@ class ControlStore:
         job or the production can never hit a 404 created by our own submit.
         """
         job_id = str(job["job_id"])
+        production = {
+            "request_json": None,
+            "profile_revision": None,
+            **production,
+        }
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -175,10 +192,11 @@ class ControlStore:
                 )
                 connection.execute(
                     """INSERT OR REPLACE INTO staged_productions (
-                        production_id, profile_id, topic, job_id, status, created_at, updated_at
+                        production_id, profile_id, topic, job_id, status, created_at,
+                        updated_at, request_json, profile_revision
                     ) VALUES (
                         :production_id, :profile_id, :topic, :job_id, :status,
-                        :created_at, :updated_at
+                        :created_at, :updated_at, :request_json, :profile_revision
                     )""",
                     production,
                 )

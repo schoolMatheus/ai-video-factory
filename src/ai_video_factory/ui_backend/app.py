@@ -90,15 +90,50 @@ def create_app(
     if bootstrap is not None:
         services = replace(services, bootstrap=bootstrap)
     control_db = Path(settings.control_db or data_root / "ui" / "control.sqlite3")
-    if services.events is None:
-        services = replace(
-            services, events=EventService(services.read_models, control_db)
-        )
     if services.jobs is None:
         services = replace(services, jobs=JobService(control_db))
+    job_service = services.jobs
+
+    from ai_video_factory.ui_backend.read_models import StagedProductionReadModels
+
+    def staged_project(profile_id: object, production_id: str) -> Path:
+        return (
+            data_root / "projects" / str(profile_id or "")
+            / production_id
+        )
+
+    def staged_for_production(production_id: str):
+        if job_service is None:
+            return None
+        submission = job_service.store.staged_production(production_id)
+        if submission is None:
+            return None
+        project = staged_project(submission.get("profile_id"), production_id)
+        if not (project / "production.json").is_file():
+            return None
+        return StagedProductionReadModels(project)
+
+    def staged_for_artifact(artifact_id: str):
+        if job_service is None:
+            return None
+        for submission in job_service.store.all_staged_productions():
+            candidate = staged_for_production(str(submission["production_id"]))
+            if candidate is not None and candidate.find_artifact(artifact_id) is not None:
+                return candidate
+        return None
+
+    if services.events is None:
+        services = replace(
+            services,
+            events=EventService(services.read_models, control_db, staged_for_production),
+        )
     if services.artifacts is None:
         services = replace(
-            services, artifacts=ArtifactService(services.read_models, artifact_root)
+            services,
+            artifacts=ArtifactService(
+                services.read_models, artifact_root,
+                control_db=control_db, staged_factory=staged_for_artifact,
+            ),
         )
     if services.profiles is None and settings.profiles_db is not None:
         services = replace(

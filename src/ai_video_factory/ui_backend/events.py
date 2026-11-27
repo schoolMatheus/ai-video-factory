@@ -10,7 +10,7 @@ from typing import Any
 
 from ai_video_factory.ui_backend.control_store import ControlStore
 from ai_video_factory.ui_backend.cursors import decode_cursor, encode_cursor
-from ai_video_factory.ui_backend.models import ConflictError, EventView
+from ai_video_factory.ui_backend.models import ConflictError, EventView, NotFoundError
 from ai_video_factory.ui_backend.read_models import ProductionReadModels
 
 
@@ -22,9 +22,26 @@ class CursorExpired(ConflictError):
 
 
 class EventService:
-    def __init__(self, read_models: ProductionReadModels, control_db: Path) -> None:
+    def __init__(
+        self,
+        read_models: ProductionReadModels,
+        control_db: Path,
+        staged_factory: Any = None,
+    ) -> None:
         self.read_models = read_models
         self.store = ControlStore(control_db)
+        self.staged_factory = staged_factory
+
+    def _models_for(self, production_id: str) -> Any:
+        """Legacy manifests or a staged production project, whichever exists."""
+        try:
+            self.read_models.get_production(production_id)
+            return self.read_models
+        except NotFoundError:
+            staged = self.staged_factory(production_id) if self.staged_factory else None
+            if staged is None:
+                raise
+            return staged
 
     # -- cursors -----------------------------------------------------------
 
@@ -52,9 +69,9 @@ class EventService:
     # -- projections -------------------------------------------------------
 
     def _reconcile(self, production_id: str) -> None:
-        # get_production validates scope and existence before any projection.
-        self.read_models.get_production(production_id)
-        self.store.insert_events(self.read_models.list_events(production_id))
+        # Scope/existence is validated by the selected read model first.
+        models = self._models_for(production_id)
+        self.store.insert_events(models.list_events(production_id))
 
     def snapshot_cursor(self, production_id: str) -> str:
         self._reconcile(production_id)
