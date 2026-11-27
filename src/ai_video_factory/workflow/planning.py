@@ -48,16 +48,32 @@ def build_assembly(
         for shot in scene.shots:
             segment = segments.get(shot.shot_id)
             selection = selections.get(shot.shot_id)
-            duration_seconds = segment.duration_seconds if segment else shot.target_seconds or 1.0
-            duration_ticks = _ticks(duration_seconds, timebase)
+            overlap_ticks = _ticks(shot.overlap_seconds, timebase)
+            if segment is not None:
+                # Measured audio is the authority. An overlap lets this shot
+                # start earlier, but its end is extended by the same amount so
+                # the visual timeline still finishes with the narration.
+                spoken_start = _ticks(segment.start_seconds, timebase)
+                spoken_end = spoken_start + _ticks(segment.duration_seconds, timebase)
+                previous_items = video_items
+                if previous_items and overlap_ticks:
+                    start_ticks = max(0, spoken_start - overlap_ticks)
+                else:
+                    start_ticks = spoken_start
+                duration_ticks = spoken_end - start_ticks
+            else:
+                duration_seconds = shot.target_seconds or 1.0
+                duration_ticks = _ticks(duration_seconds, timebase)
+                start_ticks = max(0, cursor - overlap_ticks) if video_items else cursor
+                duration_ticks += cursor - start_ticks
             if duration_ticks <= 0:
                 raise ValueError(f"shot {shot.shot_id} has no positive duration")
-            overlap_ticks = _ticks(shot.overlap_seconds, timebase)
+            cursor = start_ticks + duration_ticks
             video_items.append(AssemblyItem(
                 item_id=f"video-{shot.shot_id}",
                 scene_id=scene.scene_id,
                 shot_id=shot.shot_id,
-                start_ticks=cursor,
+                start_ticks=start_ticks,
                 duration_ticks=duration_ticks,
                 source_in_ticks=_ticks(selection.source_in_seconds, timebase) if selection else 0,
                 source_duration_ticks=_ticks(selection.source_duration_seconds, timebase) if selection and selection.source_duration_seconds else duration_ticks,
@@ -79,12 +95,11 @@ def build_assembly(
                     item_id=f"text-{shot.shot_id}",
                     scene_id=scene.scene_id,
                     shot_id=shot.shot_id,
-                    start_ticks=cursor,
+                    start_ticks=start_ticks,
                     duration_ticks=duration_ticks,
                     source_in_ticks=0,
                     text=shot.on_screen_text,
                 ))
-            cursor += duration_ticks - min(overlap_ticks, duration_ticks)
 
     tracks = [
         AssemblyTrack(track_id="video", kind="video", items=video_items),
