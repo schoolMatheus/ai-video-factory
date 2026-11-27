@@ -95,6 +95,7 @@ def _request(
     production: str | None,
     base_dir: str | None,
     budget_calls: int | None,
+    seed_source_urls: list[str] | None = None,
 ) -> ProductionRequest:
     payload: dict[str, Any] = {
         "production_id": production or f"production-{os.getpid()}",
@@ -102,7 +103,7 @@ def _request(
         "topic": topic,
         "angle": angle,
         "target_minutes": target_minutes,
-        "seed_source_urls": [],
+        "seed_source_urls": list(seed_source_urls or []),
         "base_dir": base_dir or str(data_dir() / "projects"),
     }
     if budget_calls is not None:
@@ -121,13 +122,17 @@ def run(
     base_dir: str | None = typer.Option(None, "--base-dir", help="Production root override"),
     budget_calls: int | None = typer.Option(None, "--budget-calls", min=0),
     production: str | None = typer.Option(None, "--production", help="Explicit production id"),
+    seed_source_urls: list[str] = typer.Option(
+        [], "--seed-source-url", help="Initial source URL (repeatable; optional)",
+    ),
 ) -> None:
     """Start a staged production for one explicit profile."""
     if through not in STAGE_ORDER:
         raise typer.BadParameter(f"unknown stage: {through}")
     store = open_store()
     snapshot = store.get_snapshot(profile)
-    request = _request(profile, topic, angle, target_minutes, production, base_dir, budget_calls)
+    request = _request(profile, topic, angle, target_minutes, production, base_dir,
+                       budget_calls, seed_source_urls)
     runners = build_runners(store, snapshot, data_dir())
     result = run_production(
         request, store=store, runners=runners, through=through, dry_run=dry_run,

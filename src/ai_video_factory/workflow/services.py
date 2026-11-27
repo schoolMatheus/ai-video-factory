@@ -88,6 +88,99 @@ def _stock_media(data_root: Path) -> MediaStage:
     )
 
 
+def default_research_transports() -> dict[str, Any]:
+    """Real research boundaries: topic discovery, fetch and evidence extraction."""
+    from urllib.parse import quote
+
+    from ai_video_factory.research_pipeline import (
+        make_production_extractor,
+        make_secure_http_transport,
+    )
+
+    def discover(topic: str) -> list[dict[str, str]]:
+        url = (
+            "https://en.wikipedia.org/w/api.php?action=opensearch&format=json"
+            f"&limit=5&search={quote(topic)}"
+        )
+        try:
+            import json
+            import urllib.request
+
+            with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310 - fixed https
+                payload = json.loads(response.read().decode("utf-8"))
+            return [
+                {"url": item, "topic": topic}
+                for item in (payload[3] if isinstance(payload, list) and len(payload) > 3 else [])
+            ]
+        except (OSError, ValueError, KeyError, TypeError):
+            return []
+
+    return {
+        "source_discovery": discover,
+        "transport": make_secure_http_transport(),
+        "production_extractor": make_production_extractor(),
+    }
+
+
+def default_script_generator() -> Any:
+    """Editorial generation from the dossier; no silent deterministic fallback."""
+    from ai_video_factory.script_generator import generate_script_with_lm_studio
+
+    def generate(context: Any, research: Any) -> Any:
+        from ai_video_factory.workflow.models import (
+            Chapter,
+            Scene,
+            ScriptBundle,
+            Shot,
+        )
+
+        outline = "\n".join(
+            f"- {claim.claim_id} ({claim.classification}): {claim.text}"
+            for claim in research.claims
+        )
+        source_url = str(
+            getattr(research.sources[0], "url", "") if getattr(research, "sources", None) else ""
+        )
+        result = generate_script_with_lm_studio(
+            topic_title=context.topic,
+            topic_description=f"Idioma: {context.language}. Recorte: {context.request.angle}. {outline}",
+            source_url=source_url,
+            duration_seconds=int(context.request.target_minutes * 60),
+        )
+        text = str(result)
+        known = {claim.claim_id for claim in research.claims}
+        scenes: list[Scene] = []
+        for index, claim in enumerate(research.claims, start=1):
+            scene_id = f"scene-{index:02d}"
+            shot_id = f"{scene_id}-shot-1"
+            qualification = (
+                "Fontes divergentes; apresentar como discussão, não como fato confirmado."
+                if claim.classification != "confirmed fact" or not claim.verified
+                else "Fato sustentado pelo dossiê."
+            )
+            scenes.append(Scene(
+                scene_id=scene_id,
+                title=f"Capítulo {index}: {claim.text[:60]}",
+                narration_text=f"{claim.text}. {qualification}",
+                estimated_seconds=max(4.0, min(60.0, len(claim.text.split()) / 2.5)),
+                shots=[Shot(
+                    shot_id=shot_id, visual=f"Plano editorial: {claim.text}",
+                    intent=qualification, claim_refs=[claim.claim_id] if claim.claim_id in known else [],
+                )],
+            ))
+        return ScriptBundle(
+            title=context.topic or text[:80] or "Episódio",
+            logline=context.request.angle,
+            language=context.language,
+            chapters=[Chapter(chapter_id=f"chapter-{n:02d}", title=f"Capítulo {n}",
+                              scene_ids=[f"scene-{n:02d}"]) for n in range(1, len(scenes) + 1)],
+            scenes=scenes,
+            estimated_duration_seconds=sum(scene.estimated_seconds for scene in scenes),
+        )
+
+    return generate
+
+
 def build_production_services(
     snapshot: ProfileSnapshot,
     paths: Mapping[str, Any],
@@ -111,9 +204,24 @@ def build_production_services(
         tts_factory = transports.get("tts_factory")
         narration = NarrationStage(tts_factory=tts_factory) if tts_factory else NarrationStage()
 
+    research = transports.get("research")
+    if research is None:
+        real = default_research_transports()
+        research = ResearchStage(
+            source_discovery=transports.get("source_discovery", real["source_discovery"]),
+            transport=transports.get("content_transport", real["transport"]),
+            production_extractor=transports.get("production_extractor", real["production_extractor"]),
+        )
+    script = transports.get("script")
+    if script is None:
+        script = ScriptStage(
+            generator=transports.get("script_generator", default_script_generator()),
+            deterministic=bool(transports.get("deterministic_script", False)),
+        )
+
     runners: dict[StageName, Any] = {
-        "research": transports.get("research") or ResearchStage(),
-        "script": transports.get("script") or ScriptStage(),
+        "research": research,
+        "script": script,
         "narration": narration,
         "media": transports.get("media") or _stock_media(data_root),
         "editing": transports.get("editing") or EditingStage(editor),

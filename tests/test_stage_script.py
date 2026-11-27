@@ -58,7 +58,7 @@ def _context_and_inputs(tmp_path: Path, *, language: str = "pt-BR") -> tuple[Sta
 
 def test_generated_script_links_every_fact_to_evidence_and_direction(tmp_path: Path) -> None:
     context, inputs = _context_and_inputs(tmp_path)
-    result = ScriptStage().run(context, inputs)
+    result = ScriptStage(deterministic=True).run(context, inputs)
     bundle = ScriptBundle.load(result.artifacts["bundle"].resolve(context.project_dir))
     assert bundle.language == "pt-BR"
     assert len(bundle.scenes) == 1
@@ -111,5 +111,5 @@ def test_insufficient_script_fails_without_padding(tmp_path: Path) -> None:
 
 def test_language_follows_the_profile(tmp_path: Path) -> None:
     context, inputs = _context_and_inputs(tmp_path, language="en-US")
-    bundle = ScriptStage().run(context, inputs).artifacts["bundle"].read_json(context.project_dir)
+    bundle = ScriptStage(deterministic=True).run(context, inputs).artifacts["bundle"].read_json(context.project_dir)
     assert bundle["language"] == "en-US"

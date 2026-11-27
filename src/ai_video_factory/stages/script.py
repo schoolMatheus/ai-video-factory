@@ -29,12 +29,26 @@ class ScriptStageError(RuntimeError):
 class ScriptStage:
     external = False
 
-    def __init__(self, *, generator: ScriptGenerator | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        generator: ScriptGenerator | None = None,
+        deterministic: bool = False,
+    ) -> None:
         self.generator = generator
+        self.deterministic = deterministic
 
     def run(self, context: StageContext, inputs: StageInputs) -> StageResult:
         research = inputs.research
-        bundle = self.generator(context, research) if self.generator else self._build(context, research)
+        if self.generator:
+            bundle = self.generator(context, research)
+        elif self.deterministic:
+            # Explicit test mode only: never the silent production fallback.
+            bundle = self._build(context, research)
+        else:
+            raise ScriptStageError(
+                "nenhum gerador editorial configurado; use um gerador real ou modo determinístico explícito"
+            )
         known_claims = {claim.claim_id for claim in research.claims}
         for scene in bundle.scenes:
             for shot in scene.shots:
