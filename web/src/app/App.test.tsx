@@ -24,7 +24,20 @@ describe("App shell", () => {
 
     expect(screen.getByRole("link", { name: "Ir para o conteúdo" })).toHaveFocus();
     await user.tab();
+    expect(screen.getByRole("link", { name: "AI Video Factory" })).toHaveFocus();
+    await user.tab();
     expect(screen.getByRole("link", { name: "Início" })).toHaveFocus();
+  });
+
+  it("leva à página inicial ao clicar na marca", async () => {
+    const user = userEvent.setup();
+    renderApp("/producoes");
+
+    await user.click(screen.getByRole("link", { name: "AI Video Factory" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Início", level: 1 }),
+    ).toBeInTheDocument();
   });
 
   it("mostra estado vazio com ação Nova produção", async () => {

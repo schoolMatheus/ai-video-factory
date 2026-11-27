@@ -18,7 +18,10 @@ export function AppShell({ children }: { children?: ReactNode }) {
         Ir para o conteúdo
       </a>
       <header className={styles.header}>
-        <span className={styles.brand}>AI Video Factory</span>
+        <NavLink to="/" className={styles.brand}>
+          <img className={styles.logo} src="/logo.png" alt="" width={36} height={36} />
+          AI Video Factory
+        </NavLink>
         <nav aria-label="Navegação principal">
           <ul className={styles.nav}>
             {LINKS.map((link) => (

@@ -34,10 +34,23 @@
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  color: var(--text);
+  text-decoration: none;
   font-family: var(--font-ui);
   font-size: var(--font-body);
   font-weight: var(--weight-medium);
   line-height: 1;
+}
+
+.logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex: none;
 }
 
 .nav {
